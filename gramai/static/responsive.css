@@ -1,0 +1,182 @@
+/* GRAM AI - responsive layout and layout-stability fixes.
+   Loaded last so it can correct style.css without editing it. */
+
+/* ------------------------------------------------------------------ *
+ * 1. Stability: stop content from resizing the shell or scrolling the
+ *    page sideways. Long words, wide tables and charts are the usual
+ *    culprits in a grid/flex layout, where children default to
+ *    min-width:auto and refuse to shrink.
+ * ------------------------------------------------------------------ */
+html { -webkit-text-size-adjust: 100%; }
+html, body { max-width: 100%; overflow-x: hidden; }
+
+.app-shell, main, #content, header { min-width: 0; }
+.grid > *, .stats > *, .two > *, .three > *, .card, .list-item, .form-grid > * {
+  min-width: 0;
+}
+.card, .list-item, .stat, .welcome-card, .recommendation { overflow-wrap: anywhere; }
+
+/* Tables and charts scroll inside their own box, never the page. */
+.table-wrap, .heat { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+canvas { max-width: 100% !important; }
+
+/* Reserve the scrollbar gutter so opening a long page does not shift the
+   layout horizontally. */
+@supports (scrollbar-gutter: stable) {
+  #content { scrollbar-gutter: stable; }
+}
+
+/* Images and embeds never exceed their column. */
+img, video, iframe { max-width: 100%; height: auto; }
+
+/* ------------------------------------------------------------------ *
+ * 2. Mobile navigation drawer
+ * ------------------------------------------------------------------ */
+.nav-toggle {
+  display: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--green);
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  flex: none;
+}
+.header-title { min-width: 0; flex: 1; }
+.header-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  background: #0b2e1f66;
+  z-index: 59;
+  backdrop-filter: blur(1px);
+}
+
+@media (max-width: 900px) {
+  .app-shell { display: block; }
+
+  .nav-toggle { display: grid; place-items: center; }
+
+  /* style.css collapses the sidebar to a 78px icon-only rail below 700px.
+     On a phone that costs a fifth of the width and hides every label, so the
+     rail is replaced by a labelled drawer. These selectors deliberately match
+     the specificity of the rules they override. */
+  .app-shell aside {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(272px, 82vw);
+    height: 100dvh;
+    padding: 16px 11px;
+    z-index: 60;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: translateX(-102%);
+    transition: transform .22s cubic-bezier(.2, .9, .3, 1);
+    box-shadow: 0 0 40px #0b2e1f4d;
+  }
+  .app-shell main { margin-left: 0; }
+
+  /* Bring the labels back. */
+  .app-shell .nav-btn b,
+  .app-shell .side-brand div:nth-child(2),
+  .app-shell .side-foot span { display: revert; }
+  .app-shell .nav-btn { justify-content: flex-start; font-size: 15px; }
+
+  body.nav-open .app-shell aside { transform: none; }
+  body.rtl .app-shell aside { left: auto; right: 0; transform: translateX(102%); }
+  body.rtl.nav-open .app-shell aside { transform: none; }
+
+  /* The drawer overlays content, so the page must not scroll behind it. */
+  body.nav-open { overflow: hidden; }
+
+  header {
+    height: auto;
+    min-height: 60px;
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  header h1 { font-size: 19px; }
+  .header-controls { margin-inline-start: auto; flex-wrap: nowrap; gap: 6px; }
+  .compact { padding-left: 6px; }
+  .compact select { max-width: 92px; font-size: 12px; }
+  .user-chip { padding: 5px 7px; }
+  .user-chip > div { display: none; }
+
+  #content { padding: 14px 12px 90px; }
+  .welcome-card { grid-template-columns: 1fr; padding: 18px; }
+  .welcome-card h2 { font-size: 22px; }
+  .recommendation { min-width: 0; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .two, .three { grid-template-columns: 1fr; }
+  .section-head { flex-direction: column; align-items: flex-start; }
+  .modal-card { border-radius: 14px; padding: 16px; max-height: 94dvh; }
+}
+
+@media (max-width: 520px) {
+  .stats { grid-template-columns: 1fr; }
+  .role-picker { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid .full { grid-column: auto; }
+  .hero-copy h1 { font-size: 30px; }
+  .auth-panel { margin: 10px; padding: 18px; border-radius: 16px; }
+  .list-item { flex-direction: column; align-items: flex-start; }
+  .actions { width: 100%; }
+  .actions button { flex: 1 1 auto; }
+  .modal { padding: 0; }
+  .modal-card { border-radius: 0; height: 100dvh; max-height: 100dvh; }
+}
+
+/* Touch targets stay at least 40px on coarse pointers. */
+@media (pointer: coarse) {
+  .nav-btn, .primary, .secondary, .danger-btn, .gs-btn { min-height: 42px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. Assistant panel: never escape the viewport, become a sheet on
+ *    small screens, and respect notches.
+ * ------------------------------------------------------------------ */
+.gs-panel {
+  /* Clamp against short windows so the header can never sit above the fold. */
+  max-height: calc(100dvh - 110px);
+  max-width: calc(100vw - 28px);
+}
+
+@media (max-width: 780px) {
+  .gs-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: auto;
+    max-width: 100vw;
+    height: 86dvh;
+    max-height: 86dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .gs-panel.gs-full { inset: 0; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .gs-fab { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .gs-head { padding: 11px 12px; }
+  .gs-head small { display: none; }
+  .gs-bubble { max-width: 88%; font-size: 13.5px; }
+  .gs-chips { max-height: 84px; }
+  /* 16px keeps iOS Safari from zooming the page on focus. */
+  .gs-row input { font-size: 16px; }
+}
+
+@media (max-height: 620px) {
+  .gs-panel { bottom: 8px; max-height: calc(100dvh - 16px); }
+  .gs-chips { display: none; }
+}
+
+/* Expanded mode must not exceed the viewport on any device. */
+.gs-panel.gs-full {
+  max-height: none;
+  max-width: none;
+}

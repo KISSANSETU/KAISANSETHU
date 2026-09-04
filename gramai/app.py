@@ -1,3 +1,10 @@
+# Load .env before any module reads os.environ (GROQ_API_KEY, SMTP, Razorpay).
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -1200,3 +1207,14 @@ def mission(u=Depends(roles("admin"))):
 # SIH 2026 innovation layer: non-destructive extensions to the existing application.
 from innovation_api import router as innovation_router
 app.include_router(innovation_router)
+
+
+# Multilingual interface: free, key-less machine translation with a SQLite cache.
+from i18n_service import router as i18n_router, init_i18n_schema
+init_i18n_schema()
+app.include_router(i18n_router)
+
+# GRAM Saathi: Groq-backed assistant with read-only, role-scoped access to platform data.
+from chatbot_api import router as chatbot_router, init_chatbot_schema
+init_chatbot_schema()
+app.include_router(chatbot_router)

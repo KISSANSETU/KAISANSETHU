@@ -8,7 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=v3">
+  <link rel="stylesheet" href="/static/style.css?v=v8">
+  <link rel="stylesheet" href="/static/chatbot.css?v=v8">
+  <link rel="stylesheet" href="/static/responsive.css?v=v8">
 </head>
 <body>
 <div id="toast" class="toast hidden"></div>
@@ -66,6 +68,7 @@
   </div>
 </section>
 
+<div id="navScrim" class="nav-scrim hidden"></div>
 <section id="appShell" class="app-shell hidden">
   <aside>
     <div class="side-brand"><div class="brand-mark small">G</div><div><b>GRAM AI</b><small id="portalName">Farmer Portal</small></div></div>
@@ -74,7 +77,8 @@
   </aside>
   <main>
     <header>
-      <div><small id="breadcrumb">GRAM AI</small><h1 id="pageTitle">Dashboard</h1></div>
+      <button id="navToggle" class="nav-toggle" aria-label="Menu" data-no-i18n>☰</button>
+      <div class="header-title"><small id="breadcrumb">GRAM AI</small><h1 id="pageTitle">Dashboard</h1></div>
       <div class="header-controls">
         <label class="compact">📍 <select id="stateSelect" onchange="changeState(this.value)"></select></label>
         <label class="compact">🌐 <select id="langSelect" onchange="setLanguage(this.value)"></select></label>
@@ -85,17 +89,42 @@
   </main>
 </section>
 
-<button id="chatFab" class="chat-fab hidden" onclick="toggleChat()">💬</button>
-<div id="chatPanel" class="chat-panel hidden">
-  <div class="chat-head"><div><b>GRAM Saathi</b><small data-i18n="chatHint">Ask in your language</small></div><button onclick="toggleChat()">×</button></div>
-  <div id="chatMessages" class="chat-messages"><div class="bot" data-i18n="chatWelcome">Namaste! Ask me about prices, pre-orders, payments, transport, rewards or complaints.</div></div>
-  <div class="chat-compose"><button class="mic" onclick="voiceInto('chatInput')">🎙</button><input id="chatInput" data-voice placeholder="Ask GRAM Saathi"><button onclick="sendChat()">➤</button></div>
+<div id="i18nBusy" class="hidden" data-no-i18n>Translating page…</div>
+
+<button id="gsFab" class="gs-fab hidden" aria-label="Open GRAM Saathi">💬</button>
+<div id="gsPanel" class="gs-panel hidden" role="dialog" aria-label="GRAM Saathi">
+  <div class="gs-head">
+    <div class="gs-logo">🌿</div>
+    <div class="gs-id">
+      <b data-no-i18n>GRAM Saathi</b>
+      <small id="gsSub">Reads your listings, orders, prices and forecasts</small>
+    </div>
+    <select id="gsLang" class="gs-pill" data-no-i18n title="Answer language"></select>
+    <button id="gsReset" title="New chat">⟳</button>
+    <button id="gsExpand" title="Expand">⤢</button>
+    <button id="gsClose" title="Close">×</button>
+  </div>
+  <div id="gsTool" class="gs-toolnote hidden" data-no-i18n></div>
+  <div id="gsBody" class="gs-body" data-no-i18n></div>
+  <div id="gsChips" class="gs-chips hidden" data-no-i18n></div>
+  <div class="gs-compose">
+    <div id="gsHint" class="gs-hint">Ask in your language</div>
+    <div class="gs-row">
+      <button id="gsMic" class="gs-btn" title="Speak">🎙</button>
+      <button id="gsSpeak" class="gs-btn" title="Voice replies">🔊</button>
+      <button id="gsHands" class="gs-btn" title="Hands-free mode">♾</button>
+      <input id="gsInput" placeholder="Type your question here" autocomplete="off">
+      <button id="gsSend" class="gs-btn gs-send" title="Send">➤</button>
+    </div>
+  </div>
 </div>
 
 <div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-close" onclick="closeModal()">×</button><div id="modalBody"></div></div></div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/static/app.js?v=v3"></script>
+<script src="/static/i18n.js?v=v8"></script>
+<script src="/static/app.js?v=v8"></script>
+<script src="/static/chatbot.js?v=v8"></script>
 </body>
 </html>
