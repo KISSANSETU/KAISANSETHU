@@ -1218,3 +1218,9 @@ app.include_router(i18n_router)
 from chatbot_api import router as chatbot_router, init_chatbot_schema
 init_chatbot_schema()
 app.include_router(chatbot_router)
+
+
+# KISANSETU WhatsApp bridge: Meta Cloud API webhook -> YOLO -> certificate -> inventory.
+from whatsapp_api import router as whatsapp_router, init_whatsapp_schema
+init_whatsapp_schema()
+app.include_router(whatsapp_router)
