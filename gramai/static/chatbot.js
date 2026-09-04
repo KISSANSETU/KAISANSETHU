@@ -429,22 +429,73 @@
   }
 
   /* --------------------------------- voice --------------------------------- */
-  function startVoice() {
-    var SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
-      alert(T('Voice input needs Chrome or Edge on this device.'));
-      return;
+  /* Speech recognition needs a secure context (https, or localhost). Opening the
+     site by LAN IP over http silently denies the microphone, so the reason is
+     checked up front and reported in the transcript rather than a hint line. */
+
+  var VOICE_ERR = {
+    'not-allowed': 'Microphone access is blocked. Click the lock icon in the address bar, ' +
+      'allow the microphone, then reload the page.',
+    'service-not-allowed': 'Microphone access is blocked by the browser or the operating ' +
+      'system. Allow it in your privacy settings and try again.',
+    'audio-capture': 'No microphone was found on this device.',
+    'no-speech': 'I did not hear anything. Tap the mic and speak clearly.',
+    'network': 'Speech recognition could not reach its network service. Check the connection.',
+    'aborted': ''
+  };
+
+  function voiceBlockedReason() {
+    if (!w.isSecureContext) {
+      return 'Voice needs a secure connection. Open the site over https, or on ' +
+        'localhost. Opening it by IP address over http blocks the microphone.';
     }
+    if (!(w.SpeechRecognition || w.webkitSpeechRecognition)) {
+      return 'This browser does not support voice input. Use Chrome or Edge, ' +
+        'or type your question instead.';
+    }
+    return null;
+  }
+
+  function voiceError(msg) {
+    if (!msg) return;
+    addMsg('bot', '<p>🎙 ' + esc(T(msg)) + '</p>', 'gs-error');
+    var h = $('gsHint');
+    if (h) h.textContent = T('Voice unavailable');
+  }
+
+  function startVoice() {
+    var blocked = voiceBlockedReason();
+    if (blocked) { voiceError(blocked); return; }
     if (listening) { stopVoice(); return; }
 
     stopSpeaking();
+
+    // Ask for the microphone explicitly so the browser shows its permission
+    // prompt, instead of the recognition service failing silently.
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function (stream) {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          beginRecognition();
+        })
+        .catch(function (e) {
+          voiceError(VOICE_ERR['not-allowed'] +
+            (e && e.name ? ' (' + e.name + ')' : ''));
+        });
+    } else {
+      beginRecognition();
+    }
+  }
+
+  function beginRecognition() {
+    var SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     recog = new SR();
     recog.lang = tag();
     recog.interimResults = true;
     recog.continuous = false;
     recog.maxAlternatives = 1;
 
-    var finalText = '';
+    var finalText = '', failed = false;
     var input = $('gsInput');
 
     recog.onstart = function () {
@@ -461,15 +512,25 @@
       if (input) input.value = (finalText + interim).trim();
     };
     recog.onerror = function (e) {
-      $('gsHint').textContent = T('Voice error') + ': ' + e.error;
+      failed = true;
+      // stopVoice() resets the hint, so report the failure after it runs.
       stopVoice();
+      var msg = VOICE_ERR[e.error];
+      voiceError(msg === undefined ? 'Voice error: ' + e.error : msg);
     };
     recog.onend = function () {
       stopVoice();
+      if (failed) return;
       var q = (input && input.value || '').trim();
       if (q) send(q);
     };
-    try { recog.start(); } catch (e) { stopVoice(); }
+
+    try {
+      recog.start();
+    } catch (e) {
+      stopVoice();
+      voiceError('Could not start the microphone: ' + (e.message || e.name));
+    }
   }
 
   function stopVoice() {
