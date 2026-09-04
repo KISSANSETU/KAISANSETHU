@@ -129,8 +129,9 @@ function waCertTag(it){
 async function whatsappInventorySection(){
  let d;
  try{ d=await api('/api/whatsapp/inventory'); }catch(e){ return ''; }
+ let demoLink=`<a href="/static/whatsapp_demo.html" class="secondary" style="text-decoration:none;display:inline-block;padding:8px 12px;border-radius:9px">📲 Try without WhatsApp</a>`;
  if(!d.items||!d.items.length)return section('📱 WhatsApp Inventory',
-   `<div class="empty">Send <b>"I have 30 kg rice"</b> to the KISANSETU WhatsApp number, then a photo of the produce.</div>`);
+   `<div class="empty">Send <b>"I have 30 kg rice"</b> to the KISANSETU WhatsApp number, then a photo of the produce.<br><br>${demoLink}</div>`);
  let rows=d.items.map(it=>{
   let conf=it.confidence!=null?` (${(it.confidence*100).toFixed(1)}%)`:'';
   let yolo=it.grade?`Quality grade ${esc(it.grade)}${conf}`:'Not inspected yet';
@@ -141,7 +142,7 @@ async function whatsappInventorySection(){
     <small>via WhatsApp ${esc(it.created_at||'')}</small>
    </div><div class="actions">${waStatusTag(it)}${waCertTag(it)}</div></div>`;
  }).join('');
- return section('📱 WhatsApp Inventory',`<div class="simple-list">${rows}</div>`);
+ return section('📱 WhatsApp Inventory',`<div class="simple-list">${rows}</div><div style="margin-top:12px">${demoLink}</div>`);
 }
 
 async function farmerDashboard(){let d=await api('/api/v2/v3/dashboard');let notes=await api('/api/notifications');$('content').innerHTML=`<div class="hero-reco"><div><small>${tr('todayRecommendation')}</small><h2>${esc(d.recommendation)}</h2><p>GRAM AI combines local price movement, demand and logistics before you commit a sale.</p></div><div>${badge(d.kyc.status==='VERIFIED'&&d.kyc.live_check)}</div></div><div class="grid stats-4">${card(tr('todayIncome'),fmt(d.today_income),'Revenue credited today','green')}${card(tr('totalIncome'),fmt(d.total_income),'Lifetime recorded sales')}${card(tr('openOffers'),d.open_offers,'Waiting for your action')}${card(tr('rewardPoints'),d.reward_points,'Redeem for transport / fee benefits')}</div>${section(tr('notification'),notes.slice(0,6).map(n=>`<div class="list-item"><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small></div><span class="tag">${esc(n.severity)}</span></div>`).join('')||`<div class="empty">${tr('noData')}</div>`)} ${await whatsappInventorySection()}`}

@@ -14,7 +14,8 @@ Meta retries the delivery if the response is slow.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
+from fastapi import (APIRouter, Request, HTTPException, BackgroundTasks, Depends,
+                      UploadFile, File, Form)
 from fastapi.responses import PlainTextResponse
 import os, re, sqlite3, secrets, bcrypt
 
@@ -314,8 +315,20 @@ def handle_text(sender, profile_name, text):
 
 
 def handle_image(sender, profile_name, media_id):
+    """Real WhatsApp path: resolve the media id through Meta, then process it."""
     log("WHATSAPP", f"Image from {sender}, media id={media_id}")
+    try:
+        image_path = download_whatsapp_image(media_id)
+    except Exception as e:
+        log("WHATSAPP", f"Media download failed: {e}")
+        whatsapp_send_text(sender, "❌ Could not download that photo. Please send it again.")
+        return
+    process_produce_image(sender, profile_name, image_path)
 
+
+def process_produce_image(sender, profile_name, image_path):
+    """Shared by the real webhook and the on-stage simulator: everything from
+    a saved image file onward - YOLO, certificate, inventory, reply."""
     c = db()
     pending = c.execute(
         "SELECT * FROM whatsapp_pending_produce WHERE whatsapp_number=?",
@@ -337,13 +350,6 @@ def handle_image(sender, profile_name, media_id):
     farmer = resolve_farmer(sender, profile_name)
     if not farmer:
         whatsapp_send_text(sender, "Could not link your number to a KISANSETU account.")
-        return
-
-    try:
-        image_path = download_whatsapp_image(media_id)
-    except Exception as e:
-        log("WHATSAPP", f"Media download failed: {e}")
-        whatsapp_send_text(sender, "❌ Could not download that photo. Please send it again.")
         return
 
     # Existing YOLO grader - not a second pipeline.
@@ -567,3 +573,40 @@ def whatsapp_inventory(u=Depends(get_user_dep())):
             (u["id"], local, "%" + local)).fetchall()
     c.close()
     return {"count": len(rows), "items": [dict(r) for r in rows]}
+
+
+# --------------------------------------------------------------------------
+# On-stage simulator: exercises the exact same code path as the real Meta
+# webhook (handle_text / process_produce_image) without needing WhatsApp,
+# Meta, a token, or a public URL. Useful when the live integration is being
+# demoed but a mobile network or an expired temporary Meta token is unreliable.
+# --------------------------------------------------------------------------
+@router.post("/api/whatsapp/simulate")
+async def whatsapp_simulate(
+    background: BackgroundTasks,
+    message: str = Form(default=""),
+    photo: UploadFile | None = File(default=None),
+    u=Depends(get_user_dep()),
+):
+    """Acts as the signed-in farmer's own WhatsApp number for demo purposes."""
+    digits = "".join(ch for ch in str(u.get("phone") or "") if ch.isdigit())
+    sender = digits or f"demo{u['id']}"
+    name = u.get("name", "Demo Farmer")
+
+    if message.strip():
+        background.add_task(handle_text, sender, name, message.strip())
+        log("SIMULATE", f"Text queued for {sender}: {message.strip()!r}")
+
+    if photo is not None and photo.filename:
+        contents = await photo.read()
+        ext = os.path.splitext(photo.filename)[1] or ".jpg"
+        path = os.path.join(UPLOAD_DIR, f"sim_{u['id']}_{secrets.token_hex(4)}{ext}")
+        with open(path, "wb") as f:
+            f.write(contents)
+        background.add_task(process_produce_image, sender, name, path)
+        log("SIMULATE", f"Image queued for {sender}: {path}")
+
+    if not message.strip() and (photo is None or not photo.filename):
+        raise HTTPException(400, "Send a message, a photo, or both")
+
+    return {"status": "queued", "sender": sender}

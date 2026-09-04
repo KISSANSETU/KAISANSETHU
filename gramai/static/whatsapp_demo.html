@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KISANSETU • WhatsApp Simulator</title>
+<style>
+:root{--green:#176b43;--green2:#228552;--ink:#17362a;--muted:#6d8178;--line:#dce9e1;--bg:#f4faf6}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--ink);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;
+  max-width:440px;width:100%;box-shadow:0 12px 35px rgba(24,83,55,.10)}
+h1{font-size:19px;margin:0 0 3px}
+.sub{color:var(--muted);font-size:12px;margin:0 0 18px}
+label{display:block;font-size:12px;font-weight:800;margin:14px 0 5px}
+input[type=text],input[type=file]{width:100%;padding:11px 12px;border:1px solid var(--line);
+  border-radius:10px;font:inherit;background:#f9fcfa}
+button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--green);
+  color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.hint{background:#f2faf5;border:1px solid #d5eadc;border-radius:10px;padding:10px;
+  font-size:11.5px;color:#486457;margin-top:16px;line-height:1.5}
+.result{margin-top:16px;border-radius:10px;padding:12px;font-size:12.5px;white-space:pre-wrap;display:none}
+.result.ok{background:#eef8f1;border:1px solid #cfe6d9;color:#0f5d39;display:block}
+.result.err{background:#fdecec;border:1px solid #f0cccc;color:#b83232;display:block}
+.pill{display:inline-block;background:var(--green2);color:#fff;font-size:10px;font-weight:800;
+  padding:3px 9px;border-radius:999px;letter-spacing:.3px;margin-bottom:10px}
+a.back{display:inline-block;margin-top:14px;font-size:12px;color:var(--green);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="pill">DEMO MODE — NO WHATSAPP NEEDED</span>
+  <h1>WhatsApp Simulator</h1>
+  <p class="sub">Runs the exact same backend as the real Meta webhook — parsing, YOLO grading, certificate issuance, and inventory update — without depending on WhatsApp, a token, or a public URL.</p>
+
+  <label>Message (like a farmer would type)</label>
+  <input type="text" id="msg" placeholder='e.g. "I have 30 kg rice"'>
+
+  <label>Produce photo (optional, send after the message)</label>
+  <input type="file" id="photo" accept="image/*">
+
+  <button id="send">Send as WhatsApp message</button>
+
+  <div class="hint">Log in first in the main app (this page shares that session). Send the text message, wait a few seconds, then send the photo — same two-step flow as real WhatsApp.</div>
+
+  <div id="out" class="result"></div>
+  <a class="back" href="/">&larr; Back to KISANSETU</a>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const token = localStorage.getItem('gram_token') || '';
+
+$('send').onclick = async () => {
+  const msg = $('msg').value.trim();
+  const file = $('photo').files[0];
+  const out = $('out');
+  if (!msg && !file) { out.className = 'result err'; out.textContent = 'Type a message or choose a photo first.'; return; }
+  if (!token) { out.className = 'result err'; out.textContent = 'Not logged in. Open the main app, log in, then come back to this page.'; return; }
+
+  $('send').disabled = true;
+  out.className = 'result'; out.textContent = '';
+
+  const fd = new FormData();
+  if (msg) fd.append('message', msg);
+  if (file) fd.append('photo', file);
+
+  try {
+    const r = await fetch('/api/whatsapp/simulate', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    out.className = 'result ok';
+    out.textContent = '✅ Sent as ' + d.sender + '.\nProcessing in the background — check the KISANSETU dashboard in a few seconds for the update.';
+    $('msg').value = '';
+    $('photo').value = '';
+  } catch (e) {
+    out.className = 'result err';
+    out.textContent = '❌ ' + e.message;
+  } finally {
+    $('send').disabled = false;
+  }
+};
+</script>
+</body>
+</html>
