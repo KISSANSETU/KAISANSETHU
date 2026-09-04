@@ -56,10 +56,19 @@ py -3.12 -m venv venv
 .\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+copy .env.example .env
 python seed.py
-python warm_i18n.py
+python migrate_quality.py
 python -m uvicorn app:app --reload
 ```
+
+`migrate_quality.py` is required: `seed.py` does not create the quality
+columns on `listings`, and the app errors without them.
+
+Put your Groq key in `.env` as `GROQ_API_KEY=...` to enable the assistant.
+Without it everything else still runs and the assistant uses its keyword
+fallback. `warm_i18n.py` is optional - `static/i18n/` is already committed,
+so all 24 languages work on a fresh clone.
 
 Invoke tools as `python -m <tool>`. The `.exe` shims in `venv/Scripts`
 hard-code the path the venv was created at, so they stop working if the
