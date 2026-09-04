@@ -264,22 +264,15 @@ def download_whatsapp_image(media_id):
 # --------------------------------------------------------------------------
 # Message handlers
 # --------------------------------------------------------------------------
-def handle_text(sender, profile_name, text):
-    log("WHATSAPP", f"Text from {sender}: {text!r}")
-    parsed = parse_produce_message(text)
+def store_declaration(sender, profile_name, parsed):
+    """Record a crop declaration awaiting its photo.
 
-    if not parsed:
-        whatsapp_send_text(sender,
-            "🌾 KISANSETU could not read a crop and quantity in that message.\n\n"
-            "Try one of these:\n"
-            "• I have 30 kg rice\n"
-            "• Wheat 50 kg\n"
-            "• I harvested 2 tonnes maize")
-        return
-
-    log("WHATSAPP", f"Parsed crop={parsed['crop']} "
-                    f"quantity={parsed['quantity']} {parsed['unit']} "
-                    f"({parsed['quantity_kg']} kg)")
+    Shared by the WhatsApp webhook and the in-app GRAM Saathi assistant, so
+    both write the same rows and both surface on the same dashboard section.
+    """
+    log("INVENTORY", f"Parsed crop={parsed['crop']} "
+                     f"quantity={parsed['quantity']} {parsed['unit']} "
+                     f"({parsed['quantity_kg']} kg)")
 
     farmer = resolve_farmer(sender, profile_name)
 
@@ -306,6 +299,24 @@ def handle_text(sender, profile_name, text):
     c.commit()
     c.close()
     log("INVENTORY", f"Declaration stored for {sender}")
+    return farmer
+
+
+def handle_text(sender, profile_name, text):
+    """WhatsApp path: parse, store, and reply over WhatsApp."""
+    log("WHATSAPP", f"Text from {sender}: {text!r}")
+    parsed = parse_produce_message(text)
+
+    if not parsed:
+        whatsapp_send_text(sender,
+            "🌾 KISANSETU could not read a crop and quantity in that message.\n\n"
+            "Try one of these:\n"
+            "• I have 30 kg rice\n"
+            "• Wheat 50 kg\n"
+            "• I harvested 2 tonnes maize")
+        return
+
+    store_declaration(sender, profile_name, parsed)
 
     whatsapp_send_text(sender,
         "✅ KISANSETU inventory updated!\n\n"
@@ -326,9 +337,16 @@ def handle_image(sender, profile_name, media_id):
     process_produce_image(sender, profile_name, image_path)
 
 
-def process_produce_image(sender, profile_name, image_path):
-    """Shared by the real webhook and the on-stage simulator: everything from
-    a saved image file onward - YOLO, certificate, inventory, reply."""
+def process_produce_image(sender, profile_name, image_path, notify=True):
+    """Everything from a saved image file onward - YOLO, certificate, inventory.
+
+    Shared by the WhatsApp webhook, the simulator, and the in-app assistant.
+    notify=False suppresses the WhatsApp reply and returns the result instead,
+    so the in-app chat can render it directly.
+    """
+    def out(payload):
+        return payload
+
     c = db()
     pending = c.execute(
         "SELECT * FROM whatsapp_pending_produce WHERE whatsapp_number=?",
@@ -336,11 +354,12 @@ def process_produce_image(sender, profile_name, image_path):
     c.close()
 
     if not pending:
-        whatsapp_send_text(sender,
-            "📸 Photo received, but I do not know the crop yet.\n\n"
-            "Please send the details first, for example:\n"
-            "• I have 30 kg rice")
-        return
+        if notify:
+            whatsapp_send_text(sender,
+                "📸 Photo received, but I do not know the crop yet.\n\n"
+                "Please send the details first, for example:\n"
+                "• I have 30 kg rice")
+        return out({"ok": False, "reason": "no_declaration"})
 
     crop = pending["crop"]
     quantity = pending["quantity"]
@@ -349,8 +368,9 @@ def process_produce_image(sender, profile_name, image_path):
 
     farmer = resolve_farmer(sender, profile_name)
     if not farmer:
-        whatsapp_send_text(sender, "Could not link your number to a KISANSETU account.")
-        return
+        if notify:
+            whatsapp_send_text(sender, "Could not link your number to a KISANSETU account.")
+        return out({"ok": False, "reason": "no_farmer"})
 
     # Existing YOLO grader - not a second pipeline.
     log("YOLO", "Running prediction")
@@ -359,10 +379,11 @@ def process_produce_image(sender, profile_name, image_path):
         result = analyze_produce_image(image_path, crop)
     except Exception as e:
         log("YOLO", f"Prediction failed: {e}")
-        whatsapp_send_text(sender,
-            "❌ Photo received, but quality inspection failed.\n\n"
-            f"{str(e)[:180]}")
-        return
+        if notify:
+            whatsapp_send_text(sender,
+                "❌ Photo received, but quality inspection failed.\n\n"
+                f"{str(e)[:180]}")
+        return out({"ok": False, "reason": "yolo_failed", "error": str(e)[:180]})
 
     log("YOLO", f"Grade={result['grade']} confidence={result['confidence_percent']}% "
                 f"class={result['class_name']}")
@@ -455,22 +476,37 @@ def process_produce_image(sender, profile_name, image_path):
     c.close()
     log("INVENTORY", f"Updated crop record for farmer id={farmer['id']}")
 
-    if verification_status == "mismatch":
-        whatsapp_send_text(sender,
-            "⚠️ Image verification result\n\n"
-            f"You declared: {crop}\n"
-            f"Image suggests: {detected_crop}\n"
-            f"Confidence: {result['confidence_percent']}%\n\n"
-            "Please check the crop information in KISANSETU.")
-    else:
-        whatsapp_send_text(sender,
-            "📸 Image received and inspected!\n\n"
-            f"🌾 Crop: {crop}\n"
-            f"⚖️ Quantity: {quantity:g} {unit}\n"
-            f"🏅 Quality grade: {result['grade']}\n"
-            f"🎯 Confidence: {result['confidence_percent']}%\n"
-            f"📄 Certificate: {certificate_number}\n\n"
-            "✅ Your KISANSETU inventory has been updated.")
+    if notify:
+        if verification_status == "mismatch":
+            whatsapp_send_text(sender,
+                "⚠️ Image verification result\n\n"
+                f"You declared: {crop}\n"
+                f"Image suggests: {detected_crop}\n"
+                f"Confidence: {result['confidence_percent']}%\n\n"
+                "Please check the crop information in KISANSETU.")
+        else:
+            whatsapp_send_text(sender,
+                "📸 Image received and inspected!\n\n"
+                f"🌾 Crop: {crop}\n"
+                f"⚖️ Quantity: {quantity:g} {unit}\n"
+                f"🏅 Quality grade: {result['grade']}\n"
+                f"🎯 Confidence: {result['confidence_percent']}%\n"
+                f"📄 Certificate: {certificate_number}\n\n"
+                "✅ Your KISANSETU inventory has been updated.")
+
+    return out({
+        "ok": True,
+        "crop": crop,
+        "quantity": quantity,
+        "unit": unit,
+        "grade": result["grade"],
+        "confidence_percent": result["confidence_percent"],
+        "detected_class": detected_class,
+        "detected_crop": detected_crop,
+        "verification_status": verification_status,
+        "certificate_status": certificate_status,
+        "certificate_number": certificate_number,
+    })
 
 
 def process_payload(payload):
