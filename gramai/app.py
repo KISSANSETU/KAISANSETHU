@@ -1227,3 +1227,8 @@ app.include_router(chatbot_router)
 # No reasoning here - transcripts flow into the chatbot pipeline above.
 from voice_api import router as voice_router
 app.include_router(voice_router)
+
+# India-wide crop market price comparison, backed by live AGMARKNET data
+# (data.gov.in) - not the locally seeded demo prices used elsewhere.
+from market_price_api import router as market_price_router
+app.include_router(market_price_router)

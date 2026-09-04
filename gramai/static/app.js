@@ -13184,6 +13184,39 @@ async function networkPage(role) {
 
 
 
+        <div class="link-india-section-head">
+
+          <div>
+
+            <h2>
+              🇮🇳 India Market Prices
+            </h2>
+
+            <p>
+              Search any crop for today's highest and lowest mandi price across India.
+            </p>
+
+          </div>
+
+        </div>
+
+        <div class="crop-price-search">
+          <input
+            id="cropPriceInput"
+            class="control"
+            type="text"
+            placeholder="Enter crop name... e.g. Tomato"
+            onkeydown="if(event.key==='Enter')searchCropPrice()"
+          >
+          <button class="primary" onclick="searchCropPrice()">
+            Search
+          </button>
+        </div>
+
+        <div id="cropPriceResult" class="crop-price-result"></div>
+
+
+
         <div class="link-india-stats">
 
           <div class="india-stat-card">
@@ -13263,6 +13296,7 @@ async function networkPage(role) {
             <button
   type="button"
   class="india-state-card"
+  data-state="${esc(state)}"
   onclick="openStateMarketPage('${state.replace(/'/g, "\\'")}','${role}')"
 >
 
@@ -13819,6 +13853,118 @@ function renderTrendingMarkets(rows, role) {
 
     ).join('');
 
+}
+
+/* =========================================================
+   LINK INDIA - CROP PRICE SEARCH (live AGMARKNET data)
+========================================================= */
+
+async function searchCropPrice() {
+
+  const input = $('cropPriceInput');
+  const box = $('cropPriceResult');
+  if (!box) return;
+
+  const crop = (input && input.value || '').trim();
+  if (!crop) {
+    box.innerHTML = `<div class="crop-price-error">Enter a crop name to search.</div>`;
+    return;
+  }
+
+  box.innerHTML = `<div class="empty">Searching official mandi prices for ${esc(crop)}...</div>`;
+  clearStateHighlights();
+
+  try {
+    // A manual fetch, not the shared api() helper: this endpoint's error
+    // body uses {success:false, message} rather than api()'s {detail}
+    // convention, and renderCropPrice() already understands that shape.
+    const r = await fetch(`/api/market-prices?crop=${encodeURIComponent(crop)}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const d = await r.json();
+    renderCropPrice(d);
+  } catch (e) {
+    box.innerHTML = `<div class="crop-price-error">⚠️ Market price data is temporarily unavailable. Please try again later.</div>`;
+  }
+}
+
+/* Colours the matching cards in the "Explore India by State" grid below -
+   red for the state with the highest price, green for the lowest - so the
+   search result is visible on the map of states too, not just the two
+   summary boxes. Matching is case-insensitive since state names arrive
+   from different sources (live government data vs local seed data). */
+function clearStateHighlights() {
+  document.querySelectorAll('.india-state-card.state-price-high, .india-state-card.state-price-low')
+    .forEach(el => el.classList.remove('state-price-high', 'state-price-low'));
+}
+
+function highlightStateCards(highState, lowState) {
+  clearStateHighlights();
+  const norm = s => (s || '').trim().toLowerCase();
+  document.querySelectorAll('.india-state-card[data-state]').forEach(el => {
+    const s = norm(el.dataset.state);
+    if (s && s === norm(highState)) el.classList.add('state-price-high');
+    if (s && s === norm(lowState)) el.classList.add('state-price-low');
+  });
+}
+
+function renderCropPrice(d) {
+
+  const box = $('cropPriceResult');
+  if (!box) return;
+
+  if (!d || d.success === false) {
+    box.innerHTML = `<div class="crop-price-error">⚠️ ${esc((d && d.message) || 'No market data found for this crop.')}</div>`;
+    clearStateHighlights();
+    return;
+  }
+
+  const h = d.highest, l = d.lowest;
+
+  const tied = list => (list && list.length)
+    ? `<div class="crop-price-tied">+ ${list.length} more market${list.length > 1 ? 's' : ''} at this price</div>`
+    : '';
+
+  box.innerHTML = `
+    <div class="crop-price-card">
+
+      <div class="crop-price-title">
+        🍅 ${esc((d.crop || '').toUpperCase())}
+        ${d.is_local_fallback ? '<span class="crop-price-demo-tag">Local demo data</span>' : ''}
+      </div>
+
+      <div class="crop-price-grid">
+
+        <div class="crop-price-box crop-price-high">
+          <div class="crop-price-label">🔴 HIGHEST PRICE STATE</div>
+          <div class="crop-price-state">${esc(h.state)}</div>
+          <div class="crop-price-value">${fmt(h.price)} / quintal</div>
+          <div class="crop-price-meta">Market: ${esc(h.market)}</div>
+          <div class="crop-price-meta">District: ${esc(h.district)}</div>
+          ${h.modal_price != null ? `<div class="crop-price-meta">Modal price: ${fmt(h.modal_price)}</div>` : ''}
+          ${tied(h.tied_markets)}
+        </div>
+
+        <div class="crop-price-box crop-price-low">
+          <div class="crop-price-label">🟢 LOWEST PRICE STATE</div>
+          <div class="crop-price-state">${esc(l.state)}</div>
+          <div class="crop-price-value">${fmt(l.price)} / quintal</div>
+          <div class="crop-price-meta">Market: ${esc(l.market)}</div>
+          <div class="crop-price-meta">District: ${esc(l.district)}</div>
+          ${l.modal_price != null ? `<div class="crop-price-meta">Modal price: ${fmt(l.modal_price)}</div>` : ''}
+          ${tied(l.tied_markets)}
+        </div>
+
+      </div>
+
+      <div class="crop-price-foot">
+        <span>📅 Data date: ${esc(d.date_display || d.date)}${d.is_today ? '' : ' (latest available - not today)'}</span>
+        <span>📊 Source: ${esc(d.source)}</span>
+      </div>
+
+    </div>
+  `;
+
+  highlightStateCards(h.state, l.state);
 }
 
 /* =========================================================
