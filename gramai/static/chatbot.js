@@ -10,10 +10,14 @@
   var SESSION = 'main';
   // 'auto' answers in the language the question was written in.
   var replyLang = localStorage.getItem('gram_reply_lang') || 'auto';
-  var busy = false, recog = null, listening = false, stick = true;
+  var busy = false, listening = false, stick = true;
   var speakOn = localStorage.getItem('gram_tts') === '1';
   var handsFree = false;
   var lastAnswer = '';
+
+  // Voice recording (mic -> backend STT) and playback (backend TTS) state.
+  var mediaRecorder = null, mediaChunks = [], mediaStream = null;
+  var ttsAudio = null;
 
   var VOICE_TAG = {
     en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN', ta: 'ta-IN', te: 'te-IN', bn: 'bn-IN',
@@ -25,7 +29,7 @@
   function lang() {
     return (w.currentLang) || localStorage.getItem('gram_lang') || 'en';
   }
-  function tag() { return VOICE_TAG[lang()] || 'en-IN'; }
+  function tag(l) { return VOICE_TAG[l || lang()] || 'en-IN'; }
   function authToken() {
     return (w.token) || localStorage.getItem('gram_token') || '';
   }
@@ -311,7 +315,7 @@
   }
 
   /* ------------------------------ send / stream ---------------------------- */
-  function send(text) {
+  function send(text, forceLang) {
     if (busy) return;
     var input = $('gsInput');
     var q = (text != null ? text : (input ? input.value : '')).trim();
@@ -326,6 +330,12 @@
     setSendState(true);
     typing(true);
 
+    // Explicit language selection always wins; a language detected by voice
+    // input for this one turn is used only when the picker is on 'auto', so
+    // the answer is not re-detected independently at every stage.
+    var effectiveReplyLang = (replyLang && replyLang !== 'auto')
+      ? replyLang : (forceLang || replyLang);
+
     var bubble = null, acc = '', usedTools = [], toolData = {}, answeredIn = null;
 
     fetch('/api/ai/stream', {
@@ -335,7 +345,7 @@
         'Authorization': 'Bearer ' + authToken()
       },
       body: JSON.stringify({
-        message: q, lang: lang(), reply_lang: replyLang,
+        message: q, lang: lang(), reply_lang: effectiveReplyLang,
         session_id: SESSION, state: w.currentState || null
       })
     }).then(function (r) {
@@ -400,21 +410,21 @@
       setSendState(false);
       if (acc) {
         lastAnswer = acc;
-        if (bubble) addMsgActions(bubble, acc);
-        if (speakOn) speak(acc);
+        if (bubble) addMsgActions(bubble, acc, answeredIn);
+        if (speakOn) speak(acc, answeredIn);
       }
       if (handsFree && !speakOn) startVoice();
     }
   }
 
-  function addMsgActions(wrap, raw) {
+  function addMsgActions(wrap, raw, forLang) {
     var b = wrap.querySelector('.gs-bubble');
     var bar = document.createElement('div');
     bar.className = 'gs-actions';
     bar.innerHTML =
       '<button title="' + esc(T('Read aloud')) + '">🔊</button>' +
       '<button title="' + esc(T('Copy')) + '">⧉</button>';
-    bar.children[0].onclick = function () { speak(raw); };
+    bar.children[0].onclick = function () { speak(raw, forLang); };
     bar.children[1].onclick = function () {
       try { navigator.clipboard.writeText(raw); } catch (e) {}
       bar.children[1].textContent = '✓';
@@ -429,89 +439,195 @@
   }
 
   /* --------------------------------- voice --------------------------------- */
-  function startVoice() {
-    var SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
-      alert(T('Voice input needs Chrome or Edge on this device.'));
-      return;
-    }
-    if (listening) { stopVoice(); return; }
-
-    stopSpeaking();
-    recog = new SR();
-    recog.lang = tag();
-    recog.interimResults = true;
-    recog.continuous = false;
-    recog.maxAlternatives = 1;
-
-    var finalText = '';
-    var input = $('gsInput');
-
-    recog.onstart = function () {
-      listening = true;
-      $('gsMic').classList.add('gs-listening');
-      $('gsHint').textContent = T('Listening…') + ' (' + tag() + ')';
-    };
-    recog.onresult = function (e) {
-      var interim = '';
-      for (var i = e.resultIndex; i < e.results.length; i++) {
-        var t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalText += t; else interim += t;
-      }
-      if (input) input.value = (finalText + interim).trim();
-    };
-    recog.onerror = function (e) {
-      $('gsHint').textContent = T('Voice error') + ': ' + e.error;
-      stopVoice();
-    };
-    recog.onend = function () {
-      stopVoice();
-      var q = (input && input.value || '').trim();
-      if (q) send(q);
-    };
-    try { recog.start(); } catch (e) { stopVoice(); }
+  function setHint(text) {
+    var h = $('gsHint');
+    if (h) h.textContent = text;
   }
 
-  function stopVoice() {
+  function micSupported() {
+    return !!(w.MediaRecorder && navigator.mediaDevices &&
+      navigator.mediaDevices.getUserMedia);
+  }
+
+  /* Tap to start recording, tap again to stop and send - a plain toggle so
+     "stop recording when requested" is an explicit user action. */
+  function startVoice() {
+    if (listening) { stopVoiceRecording(true); return; }
+
+    // getUserMedia only exists on a secure origin (https:// or localhost).
+    // Diagnose this explicitly - "mediaDevices is undefined" otherwise looks
+    // identical to "unsupported browser" and is much more common in practice.
+    if (w.isSecureContext === false) {
+      alert(T('Voice input needs a secure connection (https:// or localhost). ' +
+        'Open the site that way to use the microphone.'));
+      return;
+    }
+    if (!micSupported()) {
+      alert(T('Voice input needs microphone access in a modern browser.'));
+      return;
+    }
+    stopSpeaking();
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      mediaStream = stream;
+      mediaChunks = [];
+      var mime = (w.MediaRecorder.isTypeSupported &&
+        w.MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm' : '';
+      try {
+        mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime })
+                              : new MediaRecorder(stream);
+      } catch (e) {
+        setHint(T('Recording is not supported on this device.'));
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        return;
+      }
+      mediaRecorder.ondataavailable = function (e) {
+        if (e.data && e.data.size) mediaChunks.push(e.data);
+      };
+      mediaRecorder.onstop = onRecordingStop;
+      mediaRecorder.start();
+      listening = true;
+      var m = $('gsMic');
+      if (m) m.classList.add('gs-listening');
+      setHint('🔴 ' + T('Listening… tap the mic to stop'));
+    }).catch(function (e) {
+      if (e && e.name === 'NotAllowedError') {
+        setHint(T('Microphone permission was denied. Allow it in the browser\'s site settings.'));
+      } else if (e && e.name === 'NotFoundError') {
+        setHint(T('No microphone was found on this device.'));
+      } else {
+        setHint(T('Could not start the microphone.') + (e && e.message ? ' (' + e.message + ')' : ''));
+      }
+    });
+  }
+
+  function stopVoiceRecording(shouldSend) {
     listening = false;
     var m = $('gsMic');
     if (m) m.classList.remove('gs-listening');
-    var h = $('gsHint');
-    if (h) h.textContent = defaultHint();
-    if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder._shouldSend = shouldSend !== false;
+      try { mediaRecorder.stop(); } catch (e) {}
+    } else {
+      setHint(defaultHint());
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(function (t) { t.stop(); });
+      mediaStream = null;
+    }
   }
 
-  function pickVoice() {
-    var want = tag(), all = w.speechSynthesis ? speechSynthesis.getVoices() : [];
+  /* Sends the recorded clip to the backend for transcription, then feeds the
+     transcript into the existing chat pipeline like a typed message. */
+  function onRecordingStop() {
+    var shouldSend = mediaRecorder && mediaRecorder._shouldSend !== false;
+    var mimeType = mediaChunks.length ? mediaChunks[0].type : 'audio/webm';
+    var blob = new Blob(mediaChunks, { type: mimeType });
+    mediaChunks = [];
+    mediaRecorder = null;
+
+    if (!shouldSend || !blob.size) { setHint(defaultHint()); return; }
+
+    setHint('⏳ ' + T('Transcribing…'));
+    var form = new FormData();
+    form.append('audio', blob, 'speech.webm');
+    // A language hint sharply improves Whisper's accuracy on short clips -
+    // without one it can badly mis-transcribe (and mis-detect) non-English
+    // speech. Explicit language selection wins; otherwise use the interface
+    // language as the best guess, same bias detect_language() uses for text.
+    var hint = (replyLang && replyLang !== 'auto') ? replyLang : lang();
+    if (hint) form.append('language', hint);
+
+    fetch('/api/voice/transcribe', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + authToken() },
+      body: form
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      setHint(defaultHint());
+      if (!res.ok) {
+        setHint(T(res.d && res.d.detail || 'Could not transcribe audio'));
+        return;
+      }
+      var input = $('gsInput');
+      if (input) input.value = res.d.text;
+      send(res.d.text, res.d.language);
+    }).catch(function () {
+      setHint(T('Voice input failed. You can still type.'));
+    });
+  }
+
+  function pickBrowserVoice(bcp) {
+    var all = w.speechSynthesis ? speechSynthesis.getVoices() : [];
     if (!all.length) return null;
-    var exact = all.filter(function (v) { return v.lang === want; });
+    var exact = all.filter(function (v) { return v.lang === bcp; });
     if (exact.length) return exact[0];
-    var base = want.split('-')[0];
+    var base = bcp.split('-')[0];
     var near = all.filter(function (v) { return v.lang.indexOf(base) === 0; });
     if (near.length) return near[0];
     var indian = all.filter(function (v) { return v.lang.indexOf('-IN') > 0; });
     return indian.length ? indian[0] : null;
   }
 
-  function speak(text) {
-    if (!w.speechSynthesis) return;
-    stopSpeaking();
-    // Strip markdown so the voice does not read asterisks and pipes.
-    var clean = String(text).replace(/[*#`|_>]/g, ' ')
-      .replace(/\s{2,}/g, ' ').trim().slice(0, 1200);
-    if (!clean) return;
+  function setSpeaking(on) {
+    var stop = $('gsStopSpeak');
+    if (stop) stop.classList.toggle('hidden', !on);
+    var m = $('gsSpeak');
+    if (m) m.classList.toggle('gs-speaking', on);
+  }
+
+  /* Browser speechSynthesis fallback, used only when the backend TTS call
+     fails, so voice replies keep working even if gTTS or Groq is down. */
+  function speakBrowser(clean, forLang) {
+    if (!w.speechSynthesis) { setSpeaking(false); return; }
     var utt = new SpeechSynthesisUtterance(clean);
-    var v = pickVoice();
-    if (v) { utt.voice = v; utt.lang = v.lang; } else { utt.lang = tag(); }
+    var v = pickBrowserVoice(tag(forLang));
+    if (v) { utt.voice = v; utt.lang = v.lang; } else { utt.lang = tag(forLang); }
     utt.rate = 0.95;
-    utt.onend = function () {
-      if (handsFree) startVoice();
-    };
+    utt.onstart = function () { setSpeaking(true); };
+    utt.onend = function () { setSpeaking(false); if (handsFree) startVoice(); };
+    utt.onerror = function () { setSpeaking(false); };
     speechSynthesis.speak(utt);
   }
 
+  /* Reads an answer aloud in the same language it was answered in, via the
+     backend TTS endpoint, falling back to the browser's own voices. */
+  function speak(text, forLang) {
+    stopSpeaking();
+    var clean = String(text == null ? '' : text).replace(/[*#`|_>]/g, ' ')
+      .replace(/\s{2,}/g, ' ').trim().slice(0, 1200);
+    if (!clean) return;
+    var speakLang = forLang || lang();
+    setSpeaking(true);
+    fetch('/api/voice/speak', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken()
+      },
+      body: JSON.stringify({ text: clean, lang: speakLang })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('tts-failed');
+      return r.blob();
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      ttsAudio = new Audio(url);
+      ttsAudio.onended = function () {
+        setSpeaking(false); URL.revokeObjectURL(url);
+        if (handsFree) startVoice();
+      };
+      ttsAudio.onerror = function () { setSpeaking(false); URL.revokeObjectURL(url); };
+      var p = ttsAudio.play();
+      if (p && p.catch) p.catch(function () { speakBrowser(clean, speakLang); });
+    }).catch(function () {
+      speakBrowser(clean, speakLang);
+    });
+  }
+
   function stopSpeaking() {
+    if (ttsAudio) { try { ttsAudio.pause(); } catch (e) {} ttsAudio = null; }
     if (w.speechSynthesis) { try { speechSynthesis.cancel(); } catch (e) {} }
+    setSpeaking(false);
   }
 
   function toggleSpeak() {
@@ -532,7 +648,7 @@
       $('gsHint').textContent = T('Hands-free mode on');
       startVoice();
     } else {
-      stopVoice(); stopSpeaking();
+      stopVoiceRecording(false); stopSpeaking();
       $('gsHint').textContent = defaultHint();
     }
   }
@@ -597,7 +713,7 @@
   function close() {
     $('gsPanel').classList.add('hidden');
     $('gsFab').classList.remove('gs-open');
-    stopVoice(); stopSpeaking();
+    stopVoiceRecording(false); stopSpeaking();
     handsFree = false;
     var h = $('gsHands');
     if (h) h.classList.remove('gs-on');
@@ -666,6 +782,7 @@
     $('gsMic').onclick = startVoice;
     $('gsSpeak').onclick = toggleSpeak;
     $('gsHands').onclick = toggleHandsFree;
+    if ($('gsStopSpeak')) $('gsStopSpeak').onclick = stopSpeaking;
     $('gsBody').addEventListener('scroll', function () { stick = atBottom(); });
     $('gsInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }

@@ -262,7 +262,11 @@ def home():
 def login(x:Login):
     c=db();r=c.execute("select * from users where lower(email)=lower(?)",(x.email,)).fetchone();c.close()
     if not r or not vpw(x.password,r["password"]):raise HTTPException(401,"Invalid email or password")
-    if x.login_as and r["role"] != x.login_as: raise HTTPException(403,f"This account is registered as {r["role"]}, not {x.login_as}")
+    if x.login_as and r["role"] != x.login_as:
+        raise HTTPException(
+            403,
+            f"This account is registered as {r['role']}, not {x.login_as}"
+        )
     audit(r["id"],"login","success")
     return {"access_token":token(r),"token_type":"bearer","role":r["role"],"name":r["name"]}
 
@@ -1218,3 +1222,8 @@ app.include_router(i18n_router)
 from chatbot_api import router as chatbot_router, init_chatbot_schema
 init_chatbot_schema()
 app.include_router(chatbot_router)
+
+# GRAM Saathi voice: Groq Whisper for speech-to-text, gTTS for speech-out.
+# No reasoning here - transcripts flow into the chatbot pipeline above.
+from voice_api import router as voice_router
+app.include_router(voice_router)

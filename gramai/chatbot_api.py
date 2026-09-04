@@ -20,6 +20,11 @@ try:
 except Exception:  # pragma: no cover
     requests = None
 
+try:
+    import py3langid as _langid
+except Exception:  # pragma: no cover
+    _langid = None
+
 router = APIRouter(prefix="/api/ai", tags=["GRAM Saathi"])
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -560,12 +565,32 @@ SCRIPTS = [
 ]
 
 
+def _statistical_guess(text):
+    """Content-based language id, used only to disambiguate within a script.
+
+    Script alone cannot tell Hindi from Marathi or Nepali - all three use
+    Devanagari. py3langid is a plain statistical classifier (n-gram model,
+    no network call, no API key), not an LLM, so this does not add a second
+    AI provider; it only sharpens which language we hand to Groq.
+    """
+    if not _langid:
+        return None
+    try:
+        code, _conf = _langid.classify(text)
+        return (code or "").strip().lower() or None
+    except Exception:
+        return None
+
+
 def detect_language(text, ui_lang="en"):
     """Language to answer in.
 
-    Non-Latin script is a reliable signal, so it wins. Latin text is ambiguous
-    (a Hindi speaker may type on an English keyboard), so the interface
-    language decides - which also keeps plain English questions in English.
+    Non-Latin script is a reliable signal that we are in one of a handful of
+    languages sharing that script; a statistical language-id pass then picks
+    the actual one from that short list (Hindi vs Marathi vs Nepali, for
+    example). Latin text is ambiguous (a Hindi speaker may type on an English
+    keyboard), so the interface language decides - which also keeps plain
+    English questions in English.
     """
     counts = {}
     for ch in (text or ""):
@@ -582,11 +607,19 @@ def detect_language(text, ui_lang="en"):
     if counts[top] < 2:
         return ui_lang or "en"
 
-    for _, langs in SCRIPTS:
+    candidates = [top]
+    for (_lo, _hi), langs in SCRIPTS:
         if langs[0] == top:
-            # Keep the interface language when it shares the detected script.
-            return ui_lang if ui_lang in langs else top
-    return top
+            candidates = langs
+            break
+
+    guess = _statistical_guess(text)
+    if guess in candidates:
+        return guess
+
+    # No usable statistical signal: keep the interface language when it
+    # shares this script, otherwise fall back to the script's default.
+    return ui_lang if ui_lang in candidates else top
 
 # --------------------------------------------------------------------------
 # Prompt and history
