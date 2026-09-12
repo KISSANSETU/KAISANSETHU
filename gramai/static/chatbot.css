@@ -142,6 +142,10 @@ body.rtl .gs-msg.gs-me{flex-direction:row}
   animation:gsMic 1.05s ease-in-out infinite}
 @keyframes gsMic{0%,100%{box-shadow:0 0 0 0 #d9575755}
   50%{box-shadow:0 0 0 8px #d9575700}}
+.gs-btn.gs-speaking{background:#e7f5ec;border-color:var(--green);color:var(--green);
+  animation:gsSpeaking 1.3s ease-in-out infinite}
+@keyframes gsSpeaking{0%,100%{box-shadow:0 0 0 0 #1c7a4b55}
+  50%{box-shadow:0 0 0 8px #1c7a4b00}}
 
 @media(max-width:780px){
   .gs-panel{right:8px;left:8px;width:auto;bottom:88px;height:76vh;border-radius:18px}
