@@ -9,7 +9,7 @@ provider is unreachable, so the interface never shows a dead chatbot.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -441,7 +441,72 @@ def t_explain_platform(u, args):
     return {"available_topics": list(KNOWLEDGE.keys()), "all": KNOWLEDGE}
 
 
+def chat_sender_key(u):
+    """Identity used for produce declarations made inside the app.
+
+    Uses the farmer's phone so an in-app declaration and a WhatsApp message
+    from the same person land on the same record.
+    """
+    digits = "".join(ch for ch in str(u.get("phone") or "") if ch.isdigit())
+    return digits or f"app{u['id']}"
+
+
+def t_add_produce(u, args):
+    """Record a crop + quantity the farmer states in chat, awaiting a photo."""
+    if u["role"] != "farmer":
+        return {"error": "Only a farmer account can add produce to inventory."}
+
+    crop = _need(args, "crop")
+    quantity = _need(args, "quantity")
+    unit = (_need(args, "unit") or "kg").lower()
+    if not crop or quantity in (None, ""):
+        return {"error": "Both crop and quantity are required."}
+
+    try:
+        from whatsapp_api import (parse_produce_message, store_declaration,
+                                  CROP_ALIASES, UNIT_ALIASES, TO_KG)
+    except Exception as e:
+        return {"error": f"Inventory module unavailable: {e}"}
+
+    canon = CROP_ALIASES.get(str(crop).strip().lower())
+    if not canon:
+        return {"error": f"'{crop}' is not a crop GRAM AI tracks.",
+                "known_crops": sorted(set(CROP_ALIASES.values()))}
+
+    unit = UNIT_ALIASES.get(unit, unit)
+    if unit not in TO_KG:
+        return {"error": f"Unknown unit '{unit}'.", "known_units": list(TO_KG)}
+
+    try:
+        quantity = float(quantity)
+    except Exception:
+        return {"error": "Quantity must be a number."}
+    if quantity <= 0:
+        return {"error": "Quantity must be greater than zero."}
+
+    parsed = {"crop": canon, "quantity": quantity, "unit": unit,
+              "quantity_kg": round(quantity * TO_KG[unit], 3)}
+    store_declaration(chat_sender_key(u), u.get("name", ""), parsed)
+
+    return {"saved": True, "crop": canon, "quantity": quantity, "unit": unit,
+            "next_step": "Ask the farmer to attach a photo of the produce using "
+                         "the photo button in this chat, so the quality grade "
+                         "and certificate can be issued."}
+
+
 TOOLS = {
+    "add_produce_to_inventory": (t_add_produce, {
+        "description": "Record a crop and quantity the farmer says they have, so it "
+                       "enters their KISANSETU inventory. Call this whenever the "
+                       "farmer states produce they hold or harvested, e.g. 'I have "
+                       "20 kg rice'. After it succeeds, tell them to attach a photo "
+                       "with the photo button so quality can be verified.",
+        "parameters": {"type": "object", "properties": {
+            "crop": {"type": "string", "description": "Crop name, e.g. Rice"},
+            "quantity": {"type": "number"},
+            "unit": {"type": "string",
+                     "description": "kg, g, tonne or quintal. Defaults to kg."}},
+            "required": ["crop", "quantity"]}}),
     "list_crops_and_markets": (t_list_crops_and_markets, {
         "description": "List every crop GRAM AI tracks and every mandi/market in a state. "
                        "Call this first when unsure of exact crop or market names.",
@@ -929,3 +994,35 @@ def stream(body: ChatIn, u=Depends(get_user_dep())):
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",
                                       "X-Accel-Buffering": "no"})
+
+
+@router.post("/produce-photo")
+async def produce_photo(photo: UploadFile = File(...), u=Depends(get_user_dep())):
+    """Grade a produce photo attached in the chat.
+
+    Runs the same YOLO + certificate pipeline as the WhatsApp flow, but returns
+    the result so the assistant can render it in the conversation instead of
+    sending a WhatsApp message.
+    """
+    if u["role"] != "farmer":
+        raise HTTPException(403, "Only a farmer account can submit produce photos.")
+    if not photo.filename:
+        raise HTTPException(400, "No photo was attached.")
+
+    import os, secrets
+    from whatsapp_api import UPLOAD_DIR, process_produce_image
+
+    contents = await photo.read()
+    if not contents:
+        raise HTTPException(400, "The attached photo was empty.")
+
+    ext = os.path.splitext(photo.filename)[1].lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".bmp"):
+        ext = ".jpg"
+    path = os.path.join(UPLOAD_DIR, f"chat_{u['id']}_{secrets.token_hex(4)}{ext}")
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    result = process_produce_image(chat_sender_key(u), u.get("name", ""),
+                                   path, notify=False)
+    return result or {"ok": False, "reason": "unknown"}

@@ -1232,3 +1232,8 @@ app.include_router(voice_router)
 # (data.gov.in) - not the locally seeded demo prices used elsewhere.
 from market_price_api import router as market_price_router
 app.include_router(market_price_router)
+
+# KISANSETU WhatsApp bridge: Meta Cloud API webhook -> YOLO -> certificate -> inventory.
+from whatsapp_api import router as whatsapp_router, init_whatsapp_schema
+init_whatsapp_schema()
+app.include_router(whatsapp_router)

@@ -773,6 +773,66 @@
   }
 
   /* --------------------------------- wiring -------------------------------- */
+  /* --------------------------- produce photo upload ------------------------ */
+  /* Runs the same YOLO grading and certificate pipeline the WhatsApp flow uses,
+     but renders the outcome as a chat message instead of a WhatsApp reply. */
+  function sendProducePhoto(file) {
+    if (!file || busy) return;
+    busy = true;
+    setSendState(true);
+    stick = true;
+    addMsg('me', '<p>📷 ' + esc(T('Produce photo sent')) + '</p>');
+    typing(true);
+
+    var fd = new FormData();
+    fd.append('photo', file);
+
+    fetch('/api/ai/produce-photo', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + authToken() },
+      body: fd
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        return d;
+      });
+    }).then(function (d) {
+      typing(false);
+      if (!d.ok) {
+        var why = d.reason === 'no_declaration'
+          ? T('Tell me the crop and quantity first, for example: I have 20 kg rice.')
+          : (d.error || T('The photo could not be inspected.'));
+        addMsg('bot', '<p>' + esc(why) + '</p>', 'gs-error');
+        return;
+      }
+      var lines =
+        '<p><b>' + esc(T('Quality inspection complete')) + '</b></p>' +
+        '<div class="gs-kv"><span>' + esc(T('Crop')) + '</span><b>' + esc(d.crop) + '</b></div>' +
+        '<div class="gs-kv"><span>' + esc(T('Quantity')) + '</span><b>' +
+          esc(d.quantity + ' ' + d.unit) + '</b></div>' +
+        '<div class="gs-kv"><span>' + esc(T('Quality grade')) + '</span><b>' +
+          esc(d.grade) + '</b></div>' +
+        '<div class="gs-kv"><span>' + esc(T('Confidence')) + '</span><b>' +
+          esc(d.confidence_percent) + '%</b></div>' +
+        '<div class="gs-kv"><span>' + esc(T('Certificate')) + '</span><b>' +
+          esc(d.certificate_number || '-') + '</b></div>';
+      if (d.verification_status === 'mismatch') {
+        lines += '<p>⚠️ ' + esc(T('The image suggests a different crop:')) + ' ' +
+          esc(d.detected_crop || '') + '</p>';
+      } else {
+        lines += '<p>✅ ' + esc(T('Your KISANSETU inventory has been updated.')) + '</p>';
+      }
+      addMsg('bot', lines);
+    }).catch(function (e) {
+      typing(false);
+      addMsg('bot', '<p>' + esc(T('Photo upload failed.')) + '</p><p class="gs-err">' +
+        esc(e.message) + '</p>', 'gs-error');
+    }).then(function () {
+      busy = false;
+      setSendState(false);
+    });
+  }
+
   function bind() {
     $('gsFab').onclick = toggle;
     $('gsClose').onclick = close;
@@ -780,6 +840,12 @@
     $('gsReset').onclick = reset;
     $('gsSend').onclick = function () { send(); };
     $('gsMic').onclick = startVoice;
+    $('gsPhoto').onclick = function () { $('gsPhotoInput').click(); };
+    $('gsPhotoInput').onchange = function (e) {
+      var f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      sendProducePhoto(f);
+    };
     $('gsSpeak').onclick = toggleSpeak;
     $('gsHands').onclick = toggleHandsFree;
     if ($('gsStopSpeak')) $('gsStopSpeak').onclick = stopSpeaking;

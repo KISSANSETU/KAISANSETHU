@@ -1,0 +1,25 @@
+# Render/Linux install list.
+#
+# The default Linux torch wheel bundles CUDA libraries (~2.5 GB) that a CPU-only
+# host can never use and that overrun the build image. This pulls the CPU build
+# instead, which is roughly a tenth of the size.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-jose[cryptography]==3.3.0
+bcrypt==4.0.1
+python-multipart==0.0.12
+email-validator==2.2.0
+pandas>=2.2.3
+numpy>=2.1.2,<2.3
+xgboost>=2.1.1
+lightgbm>=4.5.0
+Pillow>=10.4.0
+reportlab>=4.2.5
+requests>=2.32.3
+ultralytics>=8.3.0
+python-dotenv>=1.0.1

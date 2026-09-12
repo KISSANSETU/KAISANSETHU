@@ -113,7 +113,38 @@ async function farmerRoute(k){
   if(k==='chats')return chatsPage();
 
 }
-async function farmerDashboard(){let d=await api('/api/v2/v3/dashboard');let notes=await api('/api/notifications');$('content').innerHTML=`<div class="hero-reco"><div><small>${tr('todayRecommendation')}</small><h2>${esc(d.recommendation)}</h2><p>GRAM AI combines local price movement, demand and logistics before you commit a sale.</p></div><div>${badge(d.kyc.status==='VERIFIED'&&d.kyc.live_check)}</div></div><div class="grid stats-4">${card(tr('todayIncome'),fmt(d.today_income),'Revenue credited today','green')}${card(tr('totalIncome'),fmt(d.total_income),'Lifetime recorded sales')}${card(tr('openOffers'),d.open_offers,'Waiting for your action')}${card(tr('rewardPoints'),d.reward_points,'Redeem for transport / fee benefits')}</div>${section(tr('notification'),notes.slice(0,6).map(n=>`<div class="list-item"><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small></div><span class="tag">${esc(n.severity)}</span></div>`).join('')||`<div class="empty">${tr('noData')}</div>`)} `}
+/* WhatsApp inventory: crops the farmer declared over WhatsApp, verified by YOLO. */
+function waStatusTag(it){
+ let v=it.verification_status||'awaiting_image';
+ if(v==='verified')return '<span class="tag">✓ Image verified</span>';
+ if(v==='mismatch')return '<span class="tag danger">⚠ Crop mismatch</span>';
+ return '<span class="tag warn">📸 Awaiting photo</span>';
+}
+function waCertTag(it){
+ let cs=it.certificate_status||'pending';
+ if(cs==='issued')return `<span class="tag">📄 ${esc(it.certificate_number||'Issued')}</span>`;
+ if(cs==='failed')return '<span class="tag danger">Certificate failed</span>';
+ return '<span class="tag warn">Certificate pending</span>';
+}
+async function whatsappInventorySection(){
+ let d;
+ try{ d=await api('/api/whatsapp/inventory'); }catch(e){ return ''; }
+ if(!d.items||!d.items.length)return section('🌾 My Crop Inventory',
+   `<div class="empty">Tell GRAM Saathi <b>"I have 30 kg rice"</b> in the chat, then attach a photo with the 📷 button to verify quality.</div>`);
+ let rows=d.items.map(it=>{
+  let conf=it.confidence!=null?` (${(it.confidence*100).toFixed(1)}%)`:'';
+  let yolo=it.grade?`Quality grade ${esc(it.grade)}${conf}`:'Not inspected yet';
+  let det=it.detected_crop&&it.detected_crop!==it.crop?`<small>Image suggests: ${esc(it.detected_crop)}</small>`:'';
+  return `<div class="list-item"><div>
+    <b>🌾 ${esc(it.crop)} — ${Number(it.quantity).toLocaleString('en-IN')} ${esc(it.unit||'kg')}</b>
+    <small>${esc(yolo)}</small>${det}
+    <small>${esc(it.created_at||'')}</small>
+   </div><div class="actions">${waStatusTag(it)}${waCertTag(it)}</div></div>`;
+ }).join('');
+ return section('🌾 My Crop Inventory',`<div class="simple-list">${rows}</div>`);
+}
+
+async function farmerDashboard(){let d=await api('/api/v2/v3/dashboard');let notes=await api('/api/notifications');$('content').innerHTML=`<div class="hero-reco"><div><small>${tr('todayRecommendation')}</small><h2>${esc(d.recommendation)}</h2><p>GRAM AI combines local price movement, demand and logistics before you commit a sale.</p></div><div>${badge(d.kyc.status==='VERIFIED'&&d.kyc.live_check)}</div></div><div class="grid stats-4">${card(tr('todayIncome'),fmt(d.today_income),'Revenue credited today','green')}${card(tr('totalIncome'),fmt(d.total_income),'Lifetime recorded sales')}${card(tr('openOffers'),d.open_offers,'Waiting for your action')}${card(tr('rewardPoints'),d.reward_points,'Redeem for transport / fee benefits')}</div>${section(tr('notification'),notes.slice(0,6).map(n=>`<div class="list-item"><div><b>${esc(n.title)}</b><small>${esc(n.message)}</small></div><span class="tag">${esc(n.severity)}</span></div>`).join('')||`<div class="empty">${tr('noData')}</div>`)} ${await whatsappInventorySection()}`}
 
 async function farmerCrops(){let hs=await api('/api/v2/v3/harvests');let crops=await api('/api/crops');let markets=await api('/api/markets?state=Maharashtra');$('content').innerHTML=`<div class="toolbar"><button class="primary" onclick="openVerifiedCropFlow()">＋ ${tr('addCrop')}</button><span class="soft-note">📍 Maharashtra is fixed for your selling portal. Use Link India to explore other states.</span></div>${section(tr('upcoming'),hs.length?`<div class="harvest-grid">${hs.map(h=>`<div class="harvest-card"><div class="harvest-top"><div><span class="crop-icon">🌾</span><b>${esc(h.crop)} • ${esc(h.variety)}</b></div><span class="tag ${h.buyer_visible?'success':''}">${h.buyer_visible?tr('openForBuyers'):tr('closed')}</span></div><div class="mini-grid"><span>${tr('quantity')}<b>${num(h.available_quantity_qtl)} qtl</b></span><span>${tr('date')}<b>${esc(h.expected_harvest_date)}</b></span><span>${tr('qualityGrade')}<b>${esc(h.grade_expected||'Pending')}</b></span><span>${tr('token')}<b>${fmt(h.token_amount)}</b></span></div>${h.certificate_url?button('📄 '+tr('certificate'),`openCertificate('${h.certificate_url}')`):''}</div>`).join('')}</div>`:`<div class="empty">No harvests yet. Add a verified crop using live GPS + live photo.</div>`)}${section(tr('priceForecast'),`<div class="forecast-form"><select id="fcrop" class="control">${crops.map(c=>`<option>${esc(c.name)}</option>`).join('')}</select><select id="fmarket" class="control">${markets.map(m=>`<option value="${m.id}">${esc(m.name)} • ${esc(m.district)}</option>`).join('')}</select><input id="fqty" class="control" type="number" value="10" min="1"><button class="primary" onclick="runFarmerForecast()">✨ ${tr('generate')}</button></div><div id="forecastResult"></div>`)} `}
 
