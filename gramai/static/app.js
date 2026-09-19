@@ -15092,6 +15092,13 @@ function renderStateProduce(
         <div class="india-produce-card">
 
 
+          ${
+            l.certificate && l.certificate.has_photo
+              ? `<img class="cert-card-photo" data-cert-photo="${l.certificate.photo_url}" alt="Scanned photo of ${esc(l.crop)}">`
+              : ''
+          }
+
+
           <div class="india-produce-top">
 
 
@@ -15204,6 +15211,9 @@ function renderStateProduce(
 
           </div>
 
+
+
+          ${certStrip(l.certificate)}
 
 
           <div class="market-action-row">
@@ -16782,10 +16792,16 @@ async function buyerDiscover() {
                           ? `
 
                             <img
-                              src="${esc(
-                                l.quality_image
-                                || l.image_url
-                              )}"
+                              src="${
+                                l.certificate && l.certificate.has_photo
+                                  ? ''
+                                  : esc(l.quality_image || l.image_url)
+                              }"
+                              data-cert-photo="${
+                                l.certificate && l.certificate.has_photo
+                                  ? l.certificate.photo_url
+                                  : ''
+                              }"
                               alt="${esc(l.crop)}"
                               class="discover-produce-image"
                               onerror="
@@ -16839,6 +16855,11 @@ async function buyerDiscover() {
                           }
 
                         </div>
+
+
+                        <!-- QUALITY CERTIFICATE: scan date + validity -->
+
+                        ${certStrip(l.certificate)}
 
 
                         <h3>

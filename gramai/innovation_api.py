@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import os, sqlite3, json, hashlib, hmac, secrets, math, re
+from certificate_service import attach_certificate, verification_id_for_listing
 
 try:
     import requests
@@ -1852,7 +1853,9 @@ def v3_harvests(state:str='Maharashtra',u=Depends(get_user_dep())):
       rows=c.execute('''SELECT h.*,us.name farmer_name,k.status kyc_status,q.certificate_number FROM harvests h JOIN users us ON us.id=h.farmer_id LEFT JOIN kyc_profiles k ON k.user_id=h.farmer_id LEFT JOIN quality_certificates q ON q.verification_id=h.verification_id WHERE h.state=? AND h.status='OPEN' AND h.buyer_visible=1 ORDER BY h.expected_harvest_date''',(state,)).fetchall()
     out=[]
     for r in rows:
-      d=rowdict(r);d['certificate_url']=f"/api/produce/certificate/{d['verification_id']}" if d.get('verification_id') else '';out.append(d)
+      d=rowdict(r);d['certificate_url']=f"/api/produce/certificate/{d['verification_id']}" if d.get('verification_id') else ''
+      if d.get('verification_id'):attach_certificate(c,d,d['verification_id'])
+      out.append(d)
     c.close();return out
 
 @router.get('/v3/offers')
@@ -3295,6 +3298,8 @@ def v3_listing_detail(listing_id:int,u=Depends(get_user_dep())):
     # find verification by image path so buyer can open protected certificate.
     qv=c.execute('SELECT id FROM quality_verifications WHERE image_path=? ORDER BY id DESC LIMIT 1',(d.get('quality_image') or d.get('image_url'),)).fetchone()
     if qv:d['certificate_url']=f"/api/produce/certificate/{qv['id']}"
+    vid=verification_id_for_listing(c,d) or (qv['id'] if qv else None)
+    if vid:attach_certificate(c,d,vid)
     c.close();return d
 
 @router.get('/v3/order-tracking/{order_id}')

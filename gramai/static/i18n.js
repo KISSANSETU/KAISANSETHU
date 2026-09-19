@@ -167,7 +167,8 @@
         for (var j = 0; j < added.length; j++) {
           var n = added[j];
           if (n.nodeType === 1) applyTo(n);
-          else if (n.nodeType === 3 && translatable(n.nodeValue)) {
+          else if (n.nodeType === 3 && translatable(n.nodeValue) &&
+                   !(n.parentNode && n.parentNode.closest && n.parentNode.closest('[data-no-i18n]'))) {
             if (!n.__en) n.__en = n.nodeValue;
             var hit = lookup(n.__en);
             if (hit !== null) n.nodeValue = hit; else queue(n.__en);

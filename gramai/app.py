@@ -17,7 +17,13 @@ from fastapi import (
 from quality_model import analyze_produce_image
 
 from certificate_service import (
-    generate_quality_certificate
+    generate_quality_certificate,
+    ensure_validity_columns,
+    apply_validity,
+    certificate_details,
+    verification_id_for_listing,
+    attach_certificate,
+    resolve_upload
 )
 from otp_service import (
     generate_otp,
@@ -33,7 +39,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from jose import jwt, JWTError
-import bcrypt, sqlite3, os, time, math, secrets, string, smtplib
+import bcrypt, sqlite3, os, time, math, secrets, string, smtplib, hashlib
 from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -61,6 +67,10 @@ SMTP_PASSWORD=os.environ.get("GRAMAI_SMTP_PASSWORD","")
 SMTP_FROM=os.environ.get("GRAMAI_SMTP_FROM",SMTP_USER or "no-reply@gramai.local")
 
 app=FastAPI(title="GRAM AI Whole Project API",version="1.0.0")
+try:
+    ensure_validity_columns(DB)
+except Exception as e:
+    print("Certificate validity migration skipped:", e)
 app.mount("/static",StaticFiles(directory=os.path.join(BASE,"static")),name="static")
 security=HTTPBearer(auto_error=False)
 
@@ -262,7 +272,7 @@ def home():
 def login(x:Login):
     c=db();r=c.execute("select * from users where lower(email)=lower(?)",(x.email,)).fetchone();c.close()
     if not r or not vpw(x.password,r["password"]):raise HTTPException(401,"Invalid email or password")
-    if x.login_as and r["role"] != x.login_as: raise HTTPException(403,f"This account is registered as {r["role"]}, not {x.login_as}")
+    if x.login_as and r["role"] != x.login_as: raise HTTPException(403,f"This account is registered as {r['role']}, not {x.login_as}")
     audit(r["id"],"login","success")
     return {"access_token":token(r),"token_type":"bearer","role":r["role"],"name":r["name"]}
 
@@ -574,6 +584,21 @@ def summary(u=Depends(user)):
         "listings":c.execute("select count(*) n from listings where status='OPEN'").fetchone()["n"]
     };c.close();return out
 
+@app.get("/api/public/prices")
+def public_prices():
+    """Latest average mandi price per crop for the public landing page (no login)."""
+    c=db()
+    latest=c.execute("select max(price_date) d from prices").fetchone()["d"]
+    rows=c.execute("""select p.crop,avg(p.modal_price) price,max(p.modal_price) best,
+                      (select avg(q.modal_price) from prices q where q.crop=p.crop and q.price_date=date(?,'-7 day')) week_ago,
+                      (select m.name||', '||m.state from prices q join markets m on m.id=q.market_id
+                        where q.crop=p.crop and q.price_date=? order by q.modal_price desc limit 1) best_market
+                      from prices p where p.price_date=? group by p.crop order by p.crop""",(latest,latest,latest)).fetchall()
+    c.close()
+    return {"date":latest,"crops":[{"crop":r["crop"],"price":round(r["price"]),"best":round(r["best"]),
+            "best_market":r["best_market"],
+            "change_pct":round((r["price"]-r["week_ago"])/r["week_ago"]*100,1) if r["week_ago"] else 0} for r in rows]}
+
 @app.get("/api/crops")
 def crops(u=Depends(user)):
     c=db();rows=c.execute("select * from crops order by name").fetchall();c.close();return [dict(r) for r in rows]
@@ -602,7 +627,9 @@ def transport(state:Optional[str]=None,u=Depends(user)):
 @app.get("/api/listings")
 def listings(u=Depends(user)):
     c=db();rows=c.execute("""select l.*,u.name seller_name from listings l join users u on u.id=l.seller_id
-                             where l.status='OPEN' order by l.created_at desc""").fetchall();c.close();return [dict(r) for r in rows]
+                             where l.status='OPEN' order by l.created_at desc""").fetchall()
+    out=[attach_certificate(c,dict(r),verification_id_for_listing(c,r)) if r["quality_verified"] else dict(r) for r in rows]
+    c.close();return out
 
 @app.get("/api/my-produce")
 def my_produce(u=Depends(user)):
@@ -774,7 +801,14 @@ async def inspect_produce(
         image_hash=
             result["image_sha256"],
         model_name=
-            result["model"]
+            result["model"],
+        image_path=
+            image_path,
+        scanned_at=
+            c.execute(
+                "SELECT created_at FROM quality_verifications WHERE id=?",
+                (verification_id,)
+            ).fetchone()["created_at"]
     )
 
     c.execute(
@@ -821,10 +855,17 @@ async def inspect_produce(
         )
     )
 
+    valid_until = apply_validity(
+        c,
+        verification_id
+    )
+
     c.commit()
     c.close()
 
     return {
+        "valid_until":
+            valid_until,
         "verification_id":
             verification_id,
         "certificate_number":
@@ -851,25 +892,57 @@ async def inspect_produce(
             f"/api/produce/certificate/{verification_id}"
     }
 
+@app.get("/api/produce/certificate/{verification_id}/details")
+def get_quality_certificate_details(
+    verification_id: int,
+    u=Depends(user)
+):
+    """Certificate summary for farmers and buyers: grade, scan date,
+    validity window and links to the produce photo and PDF."""
+    c = db()
+    info = certificate_details(c, verification_id)
+    c.close()
+    if not info:
+        raise HTTPException(404, "Verification not found")
+    return info
+
+
+@app.get("/api/produce/certificate/{verification_id}/photo")
+def get_quality_certificate_photo(
+    verification_id: int,
+    u=Depends(user)
+):
+    c = db()
+    row = c.execute(
+        "SELECT image_path FROM quality_verifications WHERE id=?",
+        (verification_id,)
+    ).fetchone()
+    c.close()
+    path = resolve_upload(row["image_path"]) if row else None
+    if not path:
+        raise HTTPException(404, "Produce photo not found")
+    return FileResponse(path)
+
+
 @app.get("/api/produce/certificate/{verification_id}")
 def get_quality_certificate(
     verification_id: int,
     u=Depends(user)
 ):
-
+    """Rebuild the PDF from the stored record on every download, so the
+    status line (valid / expired) is current and older certificates pick
+    up the produce photo and validity period."""
     c = db()
-
     row = c.execute(
         """
-        SELECT *
-        FROM quality_verifications
-        WHERE id=?
+        SELECT v.*, u.name farmer_name, q.certificate_number, q.scanned_at
+        FROM quality_verifications v
+        LEFT JOIN users u ON u.id = v.user_id
+        LEFT JOIN quality_certificates q ON q.verification_id = v.id
+        WHERE v.id=?
         """,
-        (
-            verification_id,
-        )
+        (verification_id,)
     ).fetchone()
-
     c.close()
 
     if not row:
@@ -878,7 +951,29 @@ def get_quality_certificate(
             "Verification not found"
         )
 
-    path = row["certificate_path"]
+    image = resolve_upload(row["image_path"])
+    image_hash = "unavailable"
+    if image:
+        with open(image, "rb") as f:
+            image_hash = hashlib.sha256(f.read()).hexdigest()
+
+    try:
+        path = generate_quality_certificate(
+            certificate_number=row["certificate_number"] or f"GRAMAI-QC-{verification_id:06d}",
+            farmer_name=row["farmer_name"] or "Farmer",
+            crop=row["crop"],
+            grade=row["predicted_grade"],
+            confidence=row["confidence"] or 0,
+            latitude=row["latitude"] or 0.0,
+            longitude=row["longitude"] or 0.0,
+            location_source=row["location_source"] or "",
+            image_hash=image_hash,
+            model_name=row["model_name"] or "YOLO",
+            image_path=row["image_path"],
+            scanned_at=row["scanned_at"] or row["created_at"]
+        )
+    except Exception:
+        path = row["certificate_path"]
 
     if not path or not os.path.exists(path):
         raise HTTPException(
@@ -1224,3 +1319,7 @@ app.include_router(chatbot_router)
 from whatsapp_api import router as whatsapp_router, init_whatsapp_schema
 init_whatsapp_schema()
 app.include_router(whatsapp_router)
+
+# GRAM Saathi Voice: hands-free voice agent (intent, speech-to-text, price hints).
+from voice_api import router as voice_router
+app.include_router(voice_router)

@@ -585,6 +585,12 @@
   }
 
   function toggleHandsFree() {
+    // Hands-free now means the full voice agent that drives the app.
+    if (w.SaathiVoice) {
+      close();
+      if (w.SaathiVoice.state.active) w.SaathiVoice.stop(); else w.SaathiVoice.start();
+      return;
+    }
     handsFree = !handsFree;
     var b = $('gsHands');
     b.classList.toggle('gs-on', handsFree);

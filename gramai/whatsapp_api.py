@@ -430,6 +430,9 @@ def process_produce_image(sender, profile_name, image_path, notify=True):
             location_source="whatsapp",
             image_hash=result["image_sha256"],
             model_name=result["model"],
+            image_path=image_path,
+            scanned_at=c.execute("SELECT created_at FROM quality_verifications WHERE id=?",
+                                 (verification_id,)).fetchone()["created_at"],
         )
         c.execute("UPDATE quality_verifications SET certificate_path=? WHERE id=?",
                   (certificate_path, verification_id))
@@ -441,6 +444,8 @@ def process_produce_image(sender, profile_name, image_path, notify=True):
             (verification_id, certificate_number, farmer["id"], crop,
              result["grade"], result["confidence"], 0.0, 0.0, certificate_path),
         )
+        from certificate_service import apply_validity
+        apply_validity(c, verification_id)
         log("CERTIFICATE", f"Issued {certificate_number}")
     except Exception as e:
         certificate_status = "failed"
