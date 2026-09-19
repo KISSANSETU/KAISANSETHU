@@ -2582,6 +2582,79 @@ header{background:#fff;border-bottom:1px solid var(--line)}
         rgba(23, 102, 57, 0.08);
 }
 
+/* Highlighted after a crop price search: solid red fill = highest price
+   state, solid green fill = lowest price state - a full block colour, not
+   a pale tint, so it reads at a glance against the rest of the grid. */
+.india-state-card.state-price-high,
+.india-state-card.state-price-low {
+    position: relative;
+
+    border-color: transparent;
+
+    box-shadow: 0 8px 22px rgba(23, 40, 30, 0.16);
+}
+
+.india-state-card.state-price-high {
+    background: linear-gradient(135deg, #d64541, var(--danger));
+}
+
+.india-state-card.state-price-low {
+    background: linear-gradient(135deg, var(--green2), var(--green));
+}
+
+.india-state-card.state-price-high:hover,
+.india-state-card.state-price-low:hover {
+    border-color: transparent;
+}
+
+.india-state-card.state-price-high h3,
+.india-state-card.state-price-high p,
+.india-state-card.state-price-high .state-arrow,
+.india-state-card.state-price-low h3,
+.india-state-card.state-price-low p,
+.india-state-card.state-price-low .state-arrow {
+    color: var(--white);
+}
+
+.india-state-card.state-price-high p,
+.india-state-card.state-price-low p {
+    opacity: .85;
+}
+
+.india-state-card.state-price-high .state-card-icon,
+.india-state-card.state-price-low .state-card-icon {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.india-state-card.state-price-high::after,
+.india-state-card.state-price-low::after {
+    position: absolute;
+    top: -8px;
+    right: 10px;
+
+    padding: 2px 8px;
+
+    border-radius: 999px;
+
+    background: var(--white);
+
+    font-size: 9.5px;
+    font-weight: 900;
+    letter-spacing: .3px;
+}
+
+.india-state-card.state-price-high::after {
+    content: "HIGHEST";
+
+    color: var(--danger);
+}
+
+.india-state-card.state-price-low::after {
+    content: "LOWEST";
+
+    color: var(--green);
+}
+
 .state-card-icon {
     width: 45px;
     height: 45px;
@@ -2615,6 +2688,179 @@ header{background:#fff;border-bottom:1px solid var(--line)}
     color: #277347;
 
     font-size: 20px;
+}
+
+
+/* CROP PRICE SEARCH */
+
+.crop-price-search {
+    display: flex;
+
+    gap: 10px;
+
+    margin-bottom: 18px;
+}
+
+.crop-price-search input {
+    flex: 1;
+}
+
+.crop-price-result:empty {
+    display: none;
+}
+
+.crop-price-card {
+    padding: 22px;
+
+    background: white;
+
+    border: 1px solid #dce8df;
+
+    border-radius: 16px;
+}
+
+.crop-price-title {
+    margin-bottom: 16px;
+
+    color: #173e2a;
+
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: .5px;
+    text-align: center;
+}
+
+.crop-price-demo-tag {
+    display: inline-block;
+
+    margin-left: 8px;
+
+    padding: 2px 9px;
+
+    background: #fff4d3;
+
+    border-radius: 999px;
+
+    color: #806100;
+
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .2px;
+    text-transform: none;
+    vertical-align: middle;
+}
+
+.crop-price-state {
+    margin-bottom: 4px;
+
+    color: #173e2a;
+
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.crop-price-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 14px;
+}
+
+.crop-price-box {
+    padding: 16px;
+
+    border: 1px solid #e2e9e4;
+
+    border-radius: 14px;
+}
+
+.crop-price-high {
+    background: #fff3f2;
+    border-color: #f3d3d0;
+}
+
+.crop-price-low {
+    background: #eef8f1;
+    border-color: #cfe6d9;
+}
+
+.crop-price-label {
+    margin-bottom: 8px;
+
+    color: #5c6a62;
+
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .5px;
+}
+
+.crop-price-value {
+    margin-bottom: 8px;
+
+    color: #173e2a;
+
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.crop-price-meta {
+    margin-top: 2px;
+
+    color: #55635a;
+
+    font-size: 12.5px;
+}
+
+.crop-price-tied {
+    margin-top: 8px;
+
+    color: #78867e;
+
+    font-size: 11px;
+    font-style: italic;
+}
+
+.crop-price-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    margin-top: 16px;
+    padding-top: 14px;
+
+    border-top: 1px dashed #e2e9e4;
+
+    color: #748179;
+
+    font-size: 11.5px;
+}
+
+.crop-price-error {
+    padding: 16px;
+
+    background: #fff2f2;
+
+    border: 1px solid #f0cccc;
+
+    border-radius: 12px;
+
+    color: #b83232;
+
+    font-size: 13px;
+}
+
+@media (max-width: 780px) {
+    .crop-price-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crop-price-search {
+        flex-direction: column;
+    }
 }
 
 

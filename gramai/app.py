@@ -1314,12 +1314,17 @@ from chatbot_api import router as chatbot_router, init_chatbot_schema
 init_chatbot_schema()
 app.include_router(chatbot_router)
 
+# GRAM Saathi voice: Groq Whisper speech-to-text, gTTS speech-out, and the
+# hands-free voice agent (intent, price hints).
+from voice_api import router as voice_router
+app.include_router(voice_router)
+
+# India-wide crop market price comparison, backed by live AGMARKNET data
+# (data.gov.in) - not the locally seeded demo prices used elsewhere.
+from market_price_api import router as market_price_router
+app.include_router(market_price_router)
 
 # KISANSETU WhatsApp bridge: Meta Cloud API webhook -> YOLO -> certificate -> inventory.
 from whatsapp_api import router as whatsapp_router, init_whatsapp_schema
 init_whatsapp_schema()
 app.include_router(whatsapp_router)
-
-# GRAM Saathi Voice: hands-free voice agent (intent, speech-to-text, price hints).
-from voice_api import router as voice_router
-app.include_router(voice_router)

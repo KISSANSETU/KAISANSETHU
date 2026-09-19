@@ -7,6 +7,7 @@ parts that need the server:
   POST /api/voice/interpret   what did the user mean? (intent + details, JSON)
   POST /api/voice/transcribe  speech to text with Groq Whisper, for browsers
                               without built-in speech recognition
+  POST /api/voice/speak       text to speech (gTTS) for the chat widget
   GET  /api/voice/price       today's price for a crop, to suggest a sale price
   GET  /api/voice/status      is the AI side available?
 
@@ -24,6 +25,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 try:
@@ -41,11 +43,11 @@ from chatbot_api import (
     legacy_answer,
     save_turn,
 )
+import voice_service
 
 router = APIRouter(prefix="/api/voice", tags=["GRAM Saathi Voice"])
 
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 STT_MODEL = os.environ.get("GROQ_STT_MODEL", "whisper-large-v3")
 
 # Page keys exactly as app.js routes them, with what each page is for.
@@ -131,9 +133,6 @@ EXPECT_HELP = {
               "options listed, or null.",
     "text": "value = the place or text they said, cleaned up, in English letters.",
 }
-
-WHISPER_LANGS = {"en", "hi", "mr", "ta", "te", "bn", "gu", "kn", "ml", "pa", "ur",
-                 "ne", "sa", "as", "sd", "or"}
 
 
 # --------------------------------------------------------------------------
@@ -374,31 +373,37 @@ def interpret(body: InterpretIn, u=Depends(get_user_dep())):
 # Speech to text (Groq Whisper)
 # --------------------------------------------------------------------------
 @router.post("/transcribe")
-async def transcribe(audio: UploadFile = File(...), lang: str = Form("en"),
-                     u=Depends(get_user_dep())):
-    if not GROQ_API_KEY or not requests:
-        raise HTTPException(503, "Server speech recognition is not configured")
+async def transcribe(audio: UploadFile = File(...), lang: Optional[str] = Form(None),
+                     language: Optional[str] = Form(None), u=Depends(get_user_dep())):
+    # The voice agent sends "lang", the chat widget's mic sends "language".
     data = await audio.read()
     if not data:
         raise HTTPException(400, "Empty recording")
     if len(data) > 15 * 1024 * 1024:
         raise HTTPException(400, "Recording too long")
-
-    fields = {"model": STT_MODEL, "response_format": "json", "temperature": "0"}
-    base = (lang or "en").split("-")[0]
-    if base in WHISPER_LANGS:
-        fields["language"] = base
-    name = audio.filename or "speech.webm"
+    hint = (language or lang or "").split("-")[0].lower() or None
     try:
-        r = requests.post(GROQ_STT_URL, data=fields, timeout=40,
-                          headers={"Authorization": "Bearer %s" % GROQ_API_KEY},
-                          files={"file": (name, data, audio.content_type or "audio/webm")})
-    except Exception as e:
-        raise HTTPException(502, "Speech service unreachable: %s" % e)
-    if r.status_code != 200:
-        raise HTTPException(502, "Speech service error: %s" % r.text[:200])
-    r.encoding = "utf-8"
-    return {"text": (r.json().get("text") or "").strip()}
+        return voice_service.transcribe(data, audio.filename or "speech.webm", hint)
+    except voice_service.VoiceError as e:
+        raise HTTPException(400, str(e))
+
+
+# --------------------------------------------------------------------------
+# Text to speech (gTTS), used by the chat widget to read answers aloud
+# --------------------------------------------------------------------------
+class SpeakIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1200)
+    lang: str = Field(default="en", max_length=12)
+
+
+@router.post("/speak")
+def speak(body: SpeakIn, u=Depends(get_user_dep())):
+    try:
+        audio = voice_service.synthesize(body.text, body.lang)
+    except voice_service.VoiceError as e:
+        raise HTTPException(400, str(e))
+    return Response(content=audio, media_type="audio/mpeg",
+                    headers={"Cache-Control": "no-store"})
 
 
 # --------------------------------------------------------------------------
