@@ -65,10 +65,10 @@ html { scroll-behavior: smooth; }
 /* ---------- nav ---------- */
 .lp-nav {
   position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 16px clamp(16px, 4vw, 56px); background: #0c0f09b3; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid #ffffff17; transition: box-shadow .2s, background .2s;
+  padding: 16px clamp(16px, 4vw, 56px); background: #0c0f0966; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid #ffffff14; transition: box-shadow .2s, background .2s;
 }
-.lp-nav.scrolled { background: #0c0f09e8; box-shadow: 0 6px 24px #00000040; }
+.lp-nav.scrolled { background: #0c0f09b3; box-shadow: 0 6px 24px #00000030; }
 .lp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .lp-logo-mark { width: 40px; height: 40px; border-radius: 12px; background: #ffffff14; border: 1px solid #ffffff2a; display: grid; place-items: center; font-size: 20px; }
 .lp-logo b { display: block; font-family: var(--lp-serif); font-size: 20px; color: #fff; line-height: 1.1; }
