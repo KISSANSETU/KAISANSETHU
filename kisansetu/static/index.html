@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KisanSetu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css?v=v20">
+  <link rel="stylesheet" href="/static/chatbot.css?v=v20">
+  <link rel="stylesheet" href="/static/responsive.css?v=v20">
+  <link rel="stylesheet" href="/static/landing.css?v=v20">
+  <link rel="stylesheet" href="/static/kisan-theme.css?v=v20">
+  <link rel="stylesheet" href="/static/voice-agent.css?v=v20">
+</head>
+<body>
+<div id="toast" class="toast hidden"></div>
+
+<section id="auth" class="lp">
+
+  <!-- ============ TOP BAR ============ -->
+  <div class="lp-nav" id="lpNav">
+    <a class="lp-logo" href="#lpTop" data-no-i18n><span class="lp-logo-mark">🌾</span><span><b>KisanSetu</b><small>Farmer Marketplace</small></span></a>
+    <div class="lp-links">
+      <a href="#lpHow">How it works</a>
+      <a href="#lpPrices">Mandi prices</a>
+      <a href="#lpWhy">Why us</a>
+    </div>
+    <div class="lp-nav-actions">
+      <button class="lp-lang-btn" onclick="LP.openLangPicker()" aria-label="Change language"><span aria-hidden="true">🌐</span> <span id="lpLangName" data-no-i18n>English</span></button>
+      <button class="lp-ghost" onclick="LP.openAuth('login')"><span aria-hidden="true">🔑</span> <span>Login</span></button>
+      <button class="lp-cta sm" onclick="LP.openAuth('register')">Sign up</button>
+    </div>
+  </div>
+
+  <!-- ============ HERO ============ -->
+  <div class="lp-hero" id="lpTop">
+    <div class="lp-hero-copy">
+      <div class="lp-hero-top">
+        <span class="lp-tag light">MADE FOR INDIAN FARMERS • 24 LANGUAGES</span>
+        <h1>Sell your harvest at the right price.</h1>
+      </div>
+      <div class="lp-hero-bottom">
+        <div class="lp-hero-bottom-copy">
+          <p>Know tomorrow's mandi price, check crop quality with a photo and sell directly to trusted buyers.</p>
+          <form class="lp-phone" onsubmit="event.preventDefault();LP.startWithPhone('lpHeroPhone')">
+            <span aria-hidden="true">📱</span>
+            <input id="lpHeroPhone" inputmode="numeric" maxlength="10" placeholder="Your mobile number" aria-label="Your mobile number">
+            <button class="lp-cta" type="submit">Get started <span aria-hidden="true">→</span></button>
+          </form>
+          <div class="lp-quick">
+            <button class="lp-listen light" onclick="LP.speakSection('lpTop')"><span aria-hidden="true">🔊</span> <span>Listen</span></button>
+            <button class="lp-listen light" onclick="LP.openLangPicker()"><span aria-hidden="true">🗣️</span> <span>Change language</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BIG "WHO ARE YOU" BUTTONS ============ -->
+  <div class="lp-who">
+    <button onclick="LP.openAuth('login','farmer')"><span class="ico" aria-hidden="true">👨‍🌾</span><span><b>I am a farmer</b><small>Sell my crop</small></span></button>
+    <button onclick="LP.openAuth('login','buyer')"><span class="ico" aria-hidden="true">🏢</span><span><b>I am a buyer</b><small>Buy fresh produce</small></span></button>
+    <div class="lp-stats">
+      <div><b data-no-i18n>24</b><span>languages</span></div>
+      <div><b data-no-i18n>72</b><span>mandis</span></div>
+      <div><b data-no-i18n>36</b><span>states &amp; UTs</span></div>
+    </div>
+  </div>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="lp-features" id="lpHow">
+    <div class="lp-sec-head">
+      <div><span class="lp-tag">HOW IT WORKS</span><h2>Everything you need to sell smarter</h2></div>
+      <p class="lp-sub">From price forecasts to verified buyers, KisanSetu handles the parts that used to need a middleman.</p>
+    </div>
+    <div class="lp-feat-grid">
+      <div class="lp-feat">
+        <div class="lp-feat-ico">📈</div>
+        <h3>Price forecast</h3>
+        <p>See prices for 1, 3 and 7 days ahead, with transport cost already subtracted, and simple advice: sell, wait, or shift markets.</p>
+      </div>
+      <div class="lp-feat">
+        <div class="lp-feat-ico">🎙️</div>
+        <h3>Works on any phone</h3>
+        <p>Speak in your own language, in any of 24 supported languages. No typing needed, every answer can be heard aloud.</p>
+      </div>
+      <div class="lp-feat">
+        <div class="lp-feat-ico">📷</div>
+        <h3>Quality certificate</h3>
+        <p>A photo of your produce gets you a quality certificate that buyers trust, no lab visit required.</p>
+      </div>
+      <div class="lp-feat">
+        <div class="lp-feat-ico">🤝</div>
+        <h3>Direct to buyer</h3>
+        <p>Sell straight to verified buyers, cutting out the middlemen. Payment is held safely until delivery.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICES CAROUSEL ============ -->
+  <section class="lp-prices" id="lpPrices">
+    <div class="lp-sec-head">
+      <div>
+        <span class="lp-tag">TODAY'S MANDI PRICES</span>
+        <h2>Crop prices across India</h2>
+        <p class="lp-sub">Average price for one quintal, and the mandi paying the most. <span id="lpPriceDate" data-no-i18n></span></p>
+      </div>
+      <div class="lp-arrows">
+        <button class="lp-listen round" onclick="LP.speakSection('lpPrices')" aria-label="Listen"><span aria-hidden="true">🔊</span></button>
+        <button onclick="LP.scrollCards(-1)" aria-label="Previous">‹</button>
+        <button onclick="LP.scrollCards(1)" aria-label="Next">›</button>
+      </div>
+    </div>
+    <div class="lp-cards" id="lpCards"></div>
+  </section>
+
+  <!-- ============ WHY ============ -->
+  <section class="lp-soil" id="lpWhy">
+    <div class="lp-soil-inner">
+      <div class="lp-sec-head light">
+        <div><span class="lp-tag">WHY KisanSetu</span><h2>Why farmers choose KisanSetu</h2></div>
+        <p class="lp-sub">Less running to the mandi, fewer middlemen, more money in your hand.</p>
+      </div>
+      <div class="lp-why">
+        <div class="lp-why-item"><div class="lp-why-ico">💰</div><h3>Fair price</h3><p>See real prices from many mandis and the money you will actually get after transport.</p><button class="lp-listen" onclick="LP.speakEl(this.parentNode)" aria-label="Listen"><span aria-hidden="true">🔊</span> <span>Listen</span></button></div>
+        <div class="lp-why-item"><div class="lp-why-ico">🤝</div><h3>Trusted buyers</h3><p>Only verified buyers. Money is held safely and released when the crop is delivered.</p><button class="lp-listen" onclick="LP.speakEl(this.parentNode)" aria-label="Listen"><span aria-hidden="true">🔊</span> <span>Listen</span></button></div>
+        <div class="lp-why-item"><div class="lp-why-ico">📷</div><h3>Quality from a photo</h3><p>Click a photo of your produce and get a quality certificate that buyers trust.</p><button class="lp-listen" onclick="LP.speakEl(this.parentNode)" aria-label="Listen"><span aria-hidden="true">🔊</span> <span>Listen</span></button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="lp-final">
+    <div class="lp-final-copy">
+      <span class="lp-tag">GET STARTED</span>
+      <h2>All your farm selling, in one place.</h2>
+      <p>Enter your mobile number. We will send you a code, no password needed.</p>
+      <form class="lp-phone" onsubmit="event.preventDefault();LP.startWithPhone('lpCtaPhone')">
+        <span aria-hidden="true">📱</span>
+        <input id="lpCtaPhone" inputmode="numeric" maxlength="10" placeholder="Your mobile number" aria-label="Your mobile number">
+        <button class="lp-cta" type="submit">Get started <span aria-hidden="true">→</span></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="lp-footer">
+    <div class="lp-foot-grid">
+      <div>
+        <div class="lp-logo light" data-no-i18n><span class="lp-logo-mark">🌾</span><span><b>KisanSetu</b><small>Farmer Marketplace</small></span></div>
+        <p>Empowering the hands that feed our nation.</p>
+      </div>
+      <div><h4>Explore</h4><a href="#lpHow">How it works</a><a href="#lpPrices">Mandi prices</a><a href="#lpWhy">Why us</a></div>
+      <div><h4>Account</h4><a href="#" onclick="event.preventDefault();LP.openAuth('login','farmer')">Farmer login</a><a href="#" onclick="event.preventDefault();LP.openAuth('login','buyer')">Buyer login</a><a href="#" onclick="event.preventDefault();LP.openAuth('register')">Sign up</a></div>
+      <div><h4>Help</h4><a href="#" onclick="event.preventDefault();LP.openLangPicker()">🌐 Change language</a><a href="#" onclick="event.preventDefault();LP.speakSection('lpTop')">🔊 Listen</a><a href="#" onclick="event.preventDefault();LP.openAuth('login','admin')">🛡️ Admin</a></div>
+    </div>
+    <div class="lp-foot-bottom"><span data-no-i18n>© 2026 KisanSetu</span><span>SIH prototype with demo data</span></div>
+  </footer>
+
+  <!-- ============ LOGIN / REGISTER DIALOG ============ -->
+  <div id="lpAuth" class="lp-dialog hidden" role="dialog" aria-modal="true" aria-label="Login">
+    <div class="lp-dialog-scrim" onclick="LP.closeAuth()"></div>
+    <div class="auth-panel">
+      <button class="lp-close" onclick="LP.closeAuth()" aria-label="Close">×</button>
+      <div class="auth-top"><div><b data-no-i18n>KisanSetu</b><small data-i18n="secureAccess">Secure role-based access</small></div><select id="authLang" onchange="setLanguage(this.value)" data-no-i18n></select></div>
+      <h2 data-i18n="loginAs">Login as whom?</h2>
+      <div class="role-picker" id="rolePicker">
+        <button onclick="selectRole('farmer')" data-role="farmer"><span>👨‍🌾</span><b data-i18n="farmer">Farmer</b><small data-i18n="farmerHint">Sell smarter</small></button>
+        <button onclick="selectRole('buyer')" data-role="buyer"><span>🏢</span><b data-i18n="buyer">Buyer</b><small data-i18n="buyerHint">Source reliably</small></button>
+        <button onclick="selectRole('admin')" data-role="admin"><span>🛡️</span><b data-i18n="admin">Admin</b><small data-i18n="adminHint">Maintain platform</small></button>
+      </div>
+      <div class="chosen-role"><span data-i18n="selectedRole">Selected role</span>: <b id="selectedRoleLabel">Farmer</b></div>
+
+      <div class="tabs"><button id="loginTab" class="active" onclick="showAuthMode('login')" data-i18n="login">Login</button><button id="registerTab" onclick="showAuthMode('register')" data-i18n="register">Register</button></div>
+
+      <div id="loginBox">
+        <div class="method-tabs"><button id="otpMethod" onclick="LP.method('otp')" data-i18n="mobileOtp">Mobile + OTP</button><button id="emailMethod" class="active" onclick="LP.method('email')" data-i18n="emailPassword">Email + Password</button></div>
+        <div id="emailBox">
+          <label data-i18n="email">Email</label><input class="control" id="email" type="email" value="farmer@gram.ai">
+          <label data-i18n="password">Password</label><input class="control" id="password" type="password" value="Farmer@123">
+          <button class="primary" onclick="login()" data-i18n="login">Login</button>
+        </div>
+        <div id="otpBox" class="hidden">
+          <label data-i18n="mobile">Mobile Number</label><input class="control" id="loginPhone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile">
+          <button class="secondary wide" onclick="sendOtp()" data-i18n="sendOtp">Send OTP</button>
+          <div id="otpEntry" class="hidden"><label data-i18n="otp">6-digit OTP</label><input class="control" id="loginOtp" inputmode="numeric" maxlength="6"><button class="primary" onclick="verifyOtp()" data-i18n="verifyLogin">Verify & Login</button></div>
+          <small id="otpMessage"></small>
+        </div>
+        <div id="authMessage" class="form-msg"></div>
+        <div class="security-note">🔐 <span data-i18n="kycNote">KYC/Aadhaar-ready verification is available after login. Full Aadhaar numbers are never stored.</span></div>
+      </div>
+
+      <div id="registerBox" class="hidden">
+        <label data-i18n="name">Full Name</label><input class="control" id="rName">
+        <label data-i18n="email">Email</label><input class="control" id="rEmail" type="email">
+        <label data-i18n="mobile">Mobile Number</label><input class="control" id="rPhone" inputmode="numeric" maxlength="10">
+        <label data-i18n="district">District</label><input class="control" id="rDistrict" value="Pune">
+        <label data-i18n="state">State</label><input class="control" id="rState" value="Maharashtra">
+        <button class="primary" onclick="registerUser()" data-i18n="register">Register</button><div id="regMessage" class="form-msg"></div>
+      </div>
+
+      <div class="demo-box" data-no-i18n><b>Demo</b><span>Farmer: farmer@gram.ai / Farmer@123</span><span>Buyer: buyer@gram.ai / Buyer@123</span><span>Admin: admin@gram.ai / Admin@123</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LANGUAGE PICKER (shown on first visit) ============ -->
+<div id="lpLangPicker" class="lp-dialog hidden" role="dialog" aria-modal="true" aria-label="Choose language" data-no-i18n>
+  <div class="lp-dialog-scrim" onclick="LP.closeLangPicker()"></div>
+  <div class="lp-lang-card">
+    <button class="lp-close" onclick="LP.closeLangPicker()" aria-label="Close">×</button>
+    <div class="lp-lang-head"><span class="lp-lang-globe">🗣️</span><div><h2>Choose your language</h2><p>अपनी भाषा चुनें • तुमची भाषा निवडा • உங்கள் மொழியைத் தேர்ந்தெடுக்கவும் • మీ భాషను ఎంచుకోండి</p></div></div>
+    <div class="lp-lang-grid" id="lpLangGrid"></div>
+  </div>
+</div>
+
+<div id="navScrim" class="nav-scrim hidden"></div>
+<section id="appShell" class="app-shell hidden">
+  <aside>
+    <div class="side-brand"><div class="brand-mark small">G</div><div><b>KisanSetu</b><small id="portalName">Farmer Portal</small></div></div>
+    <nav id="nav"></nav>
+    <div class="side-foot"><button class="nav-btn" onclick="logout()">↪ <span data-i18n="logout">Logout</span></button></div>
+  </aside>
+  <main>
+    <header>
+      <button id="navToggle" class="nav-toggle" aria-label="Menu" data-no-i18n>☰</button>
+      <div class="header-title"><small id="breadcrumb">KisanSetu</small><h1 id="pageTitle">Dashboard</h1></div>
+      <div class="header-controls">
+        <label class="compact">📍 <select id="stateSelect" onchange="changeState(this.value)"></select></label>
+        <label class="compact">🌐 <select id="langSelect" onchange="setLanguage(this.value)"></select></label>
+        <button class="user-chip" onclick="openProfile()"><span id="userInitial">U</span><div><b id="userName">User</b><small id="userRole">Farmer</small></div></button>
+      </div>
+    </header>
+    <div id="content"></div>
+  </main>
+</section>
+
+<div id="i18nBusy" class="hidden" data-no-i18n>Translating page…</div>
+
+<button id="gsFab" class="gs-fab hidden" aria-label="Open GRAM Saathi">💬</button>
+<div id="gsPanel" class="gs-panel hidden" role="dialog" aria-label="GRAM Saathi">
+  <div class="gs-head">
+    <div class="gs-logo">🌿</div>
+    <div class="gs-id">
+      <b data-no-i18n>GRAM Saathi</b>
+      <small id="gsSub">Reads your listings, orders, prices and forecasts</small>
+    </div>
+    <select id="gsLang" class="gs-pill" data-no-i18n title="Answer language"></select>
+    <button id="gsReset" title="New chat">⟳</button>
+    <button id="gsExpand" title="Expand">⤢</button>
+    <button id="gsClose" title="Close">×</button>
+  </div>
+  <div id="gsTool" class="gs-toolnote hidden" data-no-i18n></div>
+  <div id="gsBody" class="gs-body" data-no-i18n></div>
+  <div id="gsChips" class="gs-chips hidden" data-no-i18n></div>
+  <div class="gs-compose">
+    <div id="gsHint" class="gs-hint">Ask in your language</div>
+    <div class="gs-row">
+      <button id="gsMic" class="gs-btn" title="Speak">🎙</button>
+      <button id="gsPhoto" class="gs-btn" title="Send produce photo">📷</button>
+      <input id="gsPhotoInput" type="file" accept="image/*" hidden>
+      <button id="gsSpeak" class="gs-btn" title="Voice replies">🔊</button>
+      <button id="gsStopSpeak" class="gs-btn hidden" title="Stop speaking">⏹</button>
+      <button id="gsHands" class="gs-btn" title="Hands-free mode">♾</button>
+      <input id="gsInput" placeholder="Type your question here" autocomplete="off">
+      <button id="gsSend" class="gs-btn gs-send" title="Send">➤</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-close" onclick="closeModal()">×</button><div id="modalBody"></div></div></div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/i18n.js?v=v20"></script>
+<script src="/static/app.js?v=v20"></script>
+<script src="/static/chatbot.js?v=v20"></script>
+<script src="/static/landing.js?v=v20"></script>
+<script src="/static/certificate.js?v=v20"></script>
+<script src="/static/voice-agent.js?v=v20"></script>
+</body>
+</html>

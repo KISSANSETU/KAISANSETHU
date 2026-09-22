@@ -1,0 +1,124 @@
+/* KisanSetu in-app theme: matches the landing page and makes the portal easier
+   for farmers - larger text and touch targets, clearer navigation.
+   Loaded last; only restyles, never changes layout structure. */
+
+:root {
+  --green: #1f6b45;
+  --green2: #2f8f5c;
+  --green3: #e9f6ee;
+  --bg: #f7f4ec;
+  --ink: #1d2a22;
+  --line: #e2e6da;
+  --accent: #e8663d;
+}
+
+body { font-size: 15px; }
+.app-shell { background: var(--bg); }
+
+/* Layout fixes.
+   1. responsive.css sets overflow-x:hidden on html and body. That makes body a
+      scroll container, which silently disables position:sticky, so the sidebar
+      and header scrolled away and the sidebar ended part-way down long pages.
+      overflow-x:clip hides sideways overflow without creating a scroll container.
+   2. style.css gives the grid a 235px sidebar column but a later rule makes the
+      aside 250px wide, so 15px slid under the header and left a notch. */
+html, body { overflow-x: hidden; }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
+
+@media (min-width: 901px) {
+  .app-shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .app-shell aside { width: auto; height: 100vh; position: sticky; top: 0; align-self: start; overflow-y: auto; }
+}
+.app-shell main { background: var(--bg); }
+
+/* Sidebar */
+.app-shell aside, aside { background: linear-gradient(180deg, #1f6b45 0%, #17563a 100%); }
+.side-brand .brand-mark { background: #fff; color: var(--green); }
+.side-brand b { font-family: 'Fraunces', Georgia, serif; font-size: 20px; }
+.nav-btn { min-height: 48px; font-size: 15px; font-weight: 600; border-radius: 14px; }
+.nav-btn:hover { background: #ffffff1a; }
+.nav-btn.active { background: #fff; color: var(--green); box-shadow: 0 6px 16px #0003; }
+
+/* Header */
+header { background: #fffdf8; border-bottom-color: var(--line); }
+header h1, #pageTitle { font-family: 'Fraunces', Georgia, serif; font-size: 28px; letter-spacing: -.01em; }
+.header-controls select { min-height: 44px; font-size: 15px; border-radius: 12px; }
+.user-chip { min-height: 48px; border-radius: 14px; }
+
+.app-listen {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 16px;
+  border: 2px solid var(--green); background: var(--green); color: #fff; border-radius: 999px;
+  font-weight: 800; font-size: 15px;
+}
+.app-listen span[aria-hidden] { font-size: 20px; line-height: 1; }
+.app-listen:hover { background: #17563a; }
+.app-listen.speaking { background: var(--accent); border-color: var(--accent); animation: appPulse 1s infinite; }
+@keyframes appPulse { 50% { box-shadow: 0 0 0 7px #e8663d33; } }
+
+/* Content */
+.card { border-radius: 20px; border-color: var(--line); box-shadow: 0 10px 30px #1f6b450d; }
+.welcome-card { background: linear-gradient(125deg, #1f6b45, #2f8f5c 70%, #6fb04a); border-radius: 24px; }
+#content h2, #content h3 { letter-spacing: -.005em; }
+
+button.primary, .primary { min-height: 46px; border-radius: 12px; font-weight: 700; }
+button.secondary, .secondary { min-height: 44px; border-radius: 12px; font-weight: 700; }
+.control, #content select, #content input:not([type=checkbox]):not([type=radio]):not([type=range]) { min-height: 44px; font-size: 15px; }
+
+/* Chat button: bigger and warmer so it is easy to find */
+.gs-fab { width: 66px; height: 66px; font-size: 30px; background: var(--accent); box-shadow: 0 12px 30px #e8663d55; }
+
+@media (max-width: 640px) {
+  .app-listen-label { display: none; }
+  .app-listen { padding: 0; width: 48px; justify-content: center; }
+  header h1, #pageTitle { font-size: 22px; }
+}
+
+/* ---------- Quality certificate (certificate.js) ---------- */
+.cert-strip { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: #f3f9f4; }
+.cert-strip-icon { font-size: 24px; }
+.cert-strip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cert-strip-text b { font-size: 14px; }
+.cert-strip-text small { color: #5c6b62; font-size: 12px; }
+.cert-strip .secondary { min-height: 40px; padding: 0 14px; width: auto; margin: 0; }
+.cert-strip.cert-EXPIRING { background: #fff6e8; border-color: #f1d3a3; }
+.cert-strip.cert-EXPIRED { background: #fdeeee; border-color: #f0c4c4; }
+.cert-strip.cert-EXPIRED b { color: #b83232; }
+.cert-strip.cert-EXPIRING b { color: #a65f14; }
+
+.cert-view h2 { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 26px; }
+.cert-head { display: flex; align-items: center; gap: 12px; padding-right: 40px; margin-bottom: 14px; }
+.cert-head small { color: #5c6b62; font-weight: 600; letter-spacing: .03em; }
+.cert-seal { font-size: 36px; width: 60px; height: 60px; border-radius: 50%; background: #f7d774; display: grid; place-items: center; flex: none; }
+.cert-listen { margin-left: auto; }
+.cert-status { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 16px; margin-bottom: 16px; background: #e6f6ea; color: #13572f; }
+.cert-status-icon { font-size: 30px; }
+.cert-status b { font-size: 20px; }
+.cert-status p { margin: 2px 0 0; font-size: 15px; }
+.cert-status.cert-EXPIRING { background: #fff1dc; color: #7a4508; }
+.cert-status.cert-EXPIRED { background: #fde4e4; color: #8f2020; }
+.cert-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.cert-photo { margin: 0; }
+.cert-photo img, .cert-photo-missing { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px; background: #eef2ef; display: block; }
+.cert-photo-missing { display: grid; place-items: center; align-content: center; gap: 6px; font-size: 40px; color: #5c6b62; }
+.cert-photo-missing span { font-size: 14px; }
+.cert-photo figcaption { font-size: 13px; color: #5c6b62; margin-top: 6px; text-align: center; }
+.cert-facts { display: grid; gap: 8px; align-content: start; }
+.cert-grade { display: flex; align-items: baseline; gap: 10px; background: #1f6b45; color: #fff; border-radius: 14px; padding: 10px 14px; }
+.cert-grade small { opacity: .8; }
+.cert-grade b { font-family: 'Fraunces', Georgia, serif; font-size: 34px; line-height: 1; }
+.cert-grade span { margin-left: auto; font-weight: 700; }
+.cert-fact { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: #f6f8f4; }
+.cert-fact > span { font-size: 22px; width: 32px; text-align: center; }
+.cert-fact small { display: block; color: #5c6b62; font-size: 12px; }
+.cert-fact b { font-size: 15px; }
+.cert-timeline { margin: 16px 0 6px; }
+.cert-timeline-bar { height: 10px; border-radius: 99px; background: #e3e8e2; overflow: hidden; }
+.cert-timeline-bar span { display: block; height: 100%; background: linear-gradient(90deg, #6fb04a, #e8a33d, #d9534f); }
+.cert-timeline-labels { display: flex; justify-content: space-between; font-size: 12px; color: #5c6b62; margin-top: 4px; }
+.cert-note { font-size: 13px; color: #5c6b62; margin: 10px 0 14px; }
+.cert-actions .primary { width: 100%; min-height: 52px; font-size: 17px; }
+@media (max-width: 640px) {
+  .cert-body { grid-template-columns: 1fr; }
+  .cert-head h2 { font-size: 21px; }
+}
+.cert-card-photo { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px; margin-bottom: 10px; background: #eef2ef; display: block; }
