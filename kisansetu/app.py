@@ -1328,3 +1328,9 @@ app.include_router(market_price_router)
 from whatsapp_api import router as whatsapp_router, init_whatsapp_schema
 init_whatsapp_schema()
 app.include_router(whatsapp_router)
+
+# MSP Distress Redressal: dynamic MSP floor, reverse bidding, cold storage + e-DWR loan, govt procurement.
+from msp_distress.api import router as msp_distress_router
+from msp_distress import FRONTEND_DIR as MSP_DISTRESS_FRONTEND_DIR
+app.include_router(msp_distress_router)
+app.mount("/msp-distress",StaticFiles(directory=MSP_DISTRESS_FRONTEND_DIR),name="msp_distress")

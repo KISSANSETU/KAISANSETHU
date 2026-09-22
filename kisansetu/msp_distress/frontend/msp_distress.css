@@ -1,0 +1,43 @@
+/* MSP Distress Redressal — portable stylesheet. Scoped under .msp-* */
+
+.msp-banner{
+  border-radius:18px;padding:18px 20px;margin-bottom:16px;
+  display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap
+}
+.msp-banner.alert{
+  background:linear-gradient(135deg,#fff4e5,#fff8f0);
+  border:1px solid #f0c37a;border-left:7px solid #c2410c
+}
+.msp-banner.ok{
+  background:linear-gradient(135deg,#eaf8ef,#fff);
+  border:1px solid #bfe1ca;border-left:7px solid #176b3a
+}
+.msp-banner h3{margin:4px 0 8px;font-size:20px}
+.msp-floor{
+  font-size:32px;font-weight:800;color:#b42318;letter-spacing:-.03em;display:block
+}
+.msp-banner.ok .msp-floor{color:#176b3a}
+.msp-banner small{color:#6d5a3a;display:block}
+.msp-path-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:16px 0}
+.msp-path{
+  background:#fff;border:1px solid #d9e8df;border-radius:16px;padding:16px;
+  box-shadow:0 8px 24px rgba(22,94,52,.06);display:flex;flex-direction:column;gap:8px
+}
+.msp-path b{font-size:15px}
+.msp-path p{margin:0;color:#66756d;font-size:13px;line-height:1.45;flex:1}
+.msp-viz{background:#fff;border:1px solid #d9e8df;border-radius:16px;padding:16px;margin:16px 0}
+.msp-viz canvas{max-height:280px}
+.msp-stack{display:grid;gap:8px;margin-top:12px}
+.msp-bar-row{display:grid;grid-template-columns:160px 1fr 90px;gap:10px;align-items:center;font-size:13px}
+.msp-bar{height:14px;background:#eef6f1;border-radius:999px;overflow:hidden}
+.msp-bar span{display:block;height:100%;background:#176b3a}
+.msp-bar span.amber{background:#c2410c}
+.msp-bar span.gold{background:#ca8a04}
+.msp-form-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.msp-list{display:grid;gap:10px}
+.msp-item{border:1px solid #d9e8df;border-radius:12px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.msp-item small{display:block;color:#66756d;margin-top:4px}
+@media(max-width:980px){
+  .msp-path-grid,.msp-form-row{grid-template-columns:1fr}
+  .msp-bar-row{grid-template-columns:1fr}
+}
