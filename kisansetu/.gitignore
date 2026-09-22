@@ -17,3 +17,6 @@ uploads/
 
 .DS_Store
 Thumbs.db
+# MSP distress generated procurement tokens
+msp_distress/tokens/*
+!msp_distress/tokens/.gitkeep
